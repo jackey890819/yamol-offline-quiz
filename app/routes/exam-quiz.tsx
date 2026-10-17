@@ -1,47 +1,1747 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import { ArrowLeft, Play } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  BarChart3,
+  CheckCircle2,
+  Clock,
+  Eye,
+  EyeOff,
+  Flag,
+  HelpCircle,
+  LayoutGrid,
+  Play,
+  RotateCcw,
+  Send,
+  Shuffle,
+  SlidersHorizontal,
+  Sparkles,
+  Timer,
+  Trophy,
+  XCircle,
+} from "lucide-react";
 import type { Route } from "./+types/exam-quiz";
+import { ConfirmModal } from "~/components/ConfirmModal";
+import {
+  calculateQuizSummary,
+  formatCountdown,
+  formatDuration,
+  prepareQuizQuestions,
+  prepareSingleQuestion,
+} from "~/services/quizEngine";
 import { getLocalExam } from "~/services/yamolCrawler.server";
+import {
+  ALL_DIFFICULTY_LEVELS,
+  type DifficultyLevel,
+  type ExamQuestion,
+  type OptionKey,
+  type OrderStrategy,
+  type PreparedQuestion,
+  type QuestionAttempt,
+  type QuizConfig,
+  type QuizMode,
+} from "~/types/exam";
 
 export function meta({ loaderData }: Route.MetaArgs) {
   const title = loaderData?.exam?.title ?? "刷題測驗";
-  return [{ title: `刷題測驗 — ${title}` }];
+  return [
+    { title: `刷題與模擬測驗 — ${title}` },
+    {
+      name: "description",
+      content: `進行 ${title} 的單題練習或計時模擬測驗`,
+    },
+  ];
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
   const exam = await getLocalExam(params.examId);
   if (!exam) {
-    throw new Response(`找不到本地考卷 #${params.examId}`, { status: 404 });
+    throw new Response(
+      `找不到本地考卷 #${params.examId}，請先返回題庫管理中心下載此考卷。`,
+      { status: 404 }
+    );
   }
   return { exam };
 }
 
+const OPTION_KEYS: OptionKey[] = ["A", "B", "C", "D", "E"];
+
+const DIFFICULTY_BADGE_STYLE: Record<DifficultyLevel, string> = {
+  非常簡單: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  簡單: "bg-teal-100 text-teal-800 border-teal-200",
+  適中: "bg-sky-100 text-sky-800 border-sky-200",
+  困難: "bg-amber-100 text-amber-800 border-amber-200",
+  非常困難: "bg-rose-100 text-rose-800 border-rose-200",
+};
+
+type QuizPhase = "setup" | "active" | "summary";
+type ReviewFilter = "all" | "wrong_or_unanswered" | "flagged";
+type ReviewSort = "index" | "time_desc";
+
 export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
   const { exam } = loaderData;
 
-  return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-3xl space-y-4">
-        <Link
-          to={`/exams/${exam.examId}`}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          返回考卷閱覽
-        </Link>
+  // ==================== 1. 設定階段狀態 ====================
+  const [phase, setPhase] = useState<QuizPhase>("setup");
+  const [mode, setMode] = useState<QuizMode>("practice");
+  const [questionOrder, setQuestionOrder] =
+    useState<OrderStrategy>("sequential");
+  const [optionOrder, setOptionOrder] = useState<OrderStrategy>("sequential");
+  const [selectedDifficulties, setSelectedDifficulties] = useState<
+    DifficultyLevel[]
+  >([...ALL_DIFFICULTY_LEVELS]);
+  const [showDifficultyInPractice, setShowDifficultyInPractice] =
+    useState<boolean>(true);
+  const [enableTimeLimit, setEnableTimeLimit] = useState<boolean>(true);
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState<number>(60);
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xs">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
-            <Play className="h-6 w-6" />
+  // ==================== 2. 測驗進行中狀態 ====================
+  const [activeQuestions, setActiveQuestions] = useState<PreparedQuestion[]>(
+    []
+  );
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [attempts, setAttempts] = useState<Record<number, QuestionAttempt>>({});
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const [isAutoSubmittedByTimeout, setIsAutoSubmittedByTimeout] =
+    useState<boolean>(false);
+  const [showSubmitConfirmModal, setShowSubmitConfirmModal] =
+    useState<boolean>(false);
+
+  // 追蹤當前題目進入時間戳記，用於精準計算各題累計耗時
+  const questionStartRef = useRef<number | null>(null);
+  const [currentLiveElapsedMs, setCurrentLiveElapsedMs] = useState<number>(0);
+
+  // ==================== 3. 結算檢討階段狀態 ====================
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
+  const [reviewSort, setReviewSort] = useState<ReviewSort>("index");
+
+  // 統計原考卷各難度題數
+  const difficultyCounts = useMemo(() => {
+    const counts: Record<DifficultyLevel, number> = {
+      非常簡單: 0,
+      簡單: 0,
+      適中: 0,
+      困難: 0,
+      非常困難: 0,
+    };
+    for (const q of exam.questions) {
+      counts[q.difficulty] = (counts[q.difficulty] ?? 0) + 1;
+    }
+    return counts;
+  }, [exam.questions]);
+
+  // 計算單題練習模式下符合所選難度的題目數量
+  const matchingQuestionCount = useMemo(() => {
+    if (mode === "mock") return exam.questions.length;
+    if (selectedDifficulties.length === 0) return 0;
+    return exam.questions.filter((q) =>
+      selectedDifficulties.includes(q.difficulty)
+    ).length;
+  }, [exam.questions, mode, selectedDifficulties]);
+
+  const currentQuestion = activeQuestions[currentIndex];
+  const currentAttempt = currentQuestion
+    ? attempts[currentQuestion.id]
+    : undefined;
+
+  // 判斷目前題目是否仍在「思考計時中」
+  // 模擬考模式：只要在 active 階段都算思考時間
+  // 單題練習模式：尚未按下「送出答案」前算思考時間；送出後看解析不計入思考耗時
+  const isCurrentQuestionTiming =
+    phase === "active" &&
+    Boolean(currentQuestion) &&
+    (mode === "mock" || !currentAttempt?.isSubmitted);
+
+  // 將當前題目尚未寫入的停留毫秒數結算進 attempts
+  const flushCurrentQuestionTime = useCallback(() => {
+    const now = performance.now();
+    const start = questionStartRef.current;
+    if (start === null || !currentQuestion) return;
+
+    const deltaMs = Math.max(0, Math.round(now - start));
+    questionStartRef.current = now;
+
+    if (deltaMs > 0) {
+      setAttempts((prev) => {
+        const existing = prev[currentQuestion.id];
+        if (!existing) return prev;
+        return {
+          ...prev,
+          [currentQuestion.id]: {
+            ...existing,
+            elapsedMs: existing.elapsedMs + deltaMs,
+          },
+        };
+      });
+    }
+  }, [currentQuestion]);
+
+  // 當切換題目或計時狀態改變時，重設或停止單題計時起點並每秒更新畫面顯示秒數
+  useEffect(() => {
+    if (!isCurrentQuestionTiming || !currentQuestion) {
+      questionStartRef.current = null;
+      return;
+    }
+
+    questionStartRef.current = performance.now();
+    const baseElapsed = attempts[currentQuestion.id]?.elapsedMs ?? 0;
+
+    const intervalId = window.setInterval(() => {
+      if (questionStartRef.current !== null) {
+        const delta = Math.max(
+          0,
+          Math.round(performance.now() - questionStartRef.current)
+        );
+        setCurrentLiveElapsedMs(baseElapsed + delta);
+      }
+    }, 200);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [
+    currentIndex,
+    currentQuestion,
+    isCurrentQuestionTiming,
+    attempts,
+  ]);
+
+  // 結束測驗並進入結算畫面
+  const finalizeQuiz = useCallback(
+    (autoByTimeout = false) => {
+      flushCurrentQuestionTime();
+      questionStartRef.current = null;
+      setIsAutoSubmittedByTimeout(autoByTimeout);
+      setShowSubmitConfirmModal(false);
+      setReviewFilter("all");
+      setReviewSort("index");
+      setPhase("summary");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [flushCurrentQuestionTime]
+  );
+
+  // 模擬考模式：全域倒數計時器
+  useEffect(() => {
+    if (
+      phase !== "active" ||
+      mode !== "mock" ||
+      remainingSeconds === null ||
+      remainingSeconds <= 0
+    ) {
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      setRemainingSeconds((prev) => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          window.clearInterval(timerId);
+          finalizeQuiz(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [phase, mode, remainingSeconds, finalizeQuiz]);
+
+  // 啟動測驗（支援傳入自訂題目清單，例如「針對本次錯題重新練習」）
+  const startQuizWithQuestions = (
+    sourceQuestions: readonly ExamQuestion[],
+    overrideConfig?: Partial<QuizConfig>
+  ) => {
+    const effectiveMode = overrideConfig?.mode ?? mode;
+    const effectiveQuestionOrder =
+      overrideConfig?.questionOrder ?? questionOrder;
+    const effectiveOptionOrder = overrideConfig?.optionOrder ?? optionOrder;
+    const effectiveDifficulties =
+      overrideConfig?.selectedDifficulties ??
+      (effectiveMode === "practice"
+        ? selectedDifficulties
+        : [...ALL_DIFFICULTY_LEVELS]);
+
+    const prepared = overrideConfig?.selectedDifficulties
+      ? prepareQuizQuestions(sourceQuestions, {
+          questionOrder: effectiveQuestionOrder,
+          optionOrder: effectiveOptionOrder,
+          selectedDifficulties: effectiveDifficulties,
+        })
+      : effectiveMode === "mock"
+        ? (effectiveQuestionOrder === "random"
+            ? prepareQuizQuestions(sourceQuestions, {
+                questionOrder: "random",
+                optionOrder: effectiveOptionOrder,
+                selectedDifficulties: [],
+              })
+            : sourceQuestions.map((q, idx) =>
+                prepareSingleQuestion(q, idx + 1, effectiveOptionOrder)
+              ))
+        : prepareQuizQuestions(sourceQuestions, {
+            questionOrder: effectiveQuestionOrder,
+            optionOrder: effectiveOptionOrder,
+            selectedDifficulties: effectiveDifficulties,
+          });
+
+    if (prepared.length === 0) return;
+
+    const initialAttempts: Record<number, QuestionAttempt> = {};
+    for (const q of prepared) {
+      initialAttempts[q.id] = {
+        questionId: q.id,
+        questionNumber: q.questionNumber,
+        selectedOption: null,
+        isSubmitted: false,
+        isCorrect: false,
+        isFlagged: false,
+        elapsedMs: 0,
+      };
+    }
+
+    setActiveQuestions(prepared);
+    setAttempts(initialAttempts);
+    setCurrentIndex(0);
+    setCurrentLiveElapsedMs(0);
+    setIsAutoSubmittedByTimeout(false);
+
+    if (
+      effectiveMode === "mock" &&
+      enableTimeLimit &&
+      timeLimitMinutes > 0
+    ) {
+      setRemainingSeconds(timeLimitMinutes * 60);
+    } else {
+      setRemainingSeconds(null);
+    }
+
+    setPhase("active");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // 切換題目（自動結算前一題耗時）
+  const goToQuestion = useCallback(
+    (targetIndex: number) => {
+      if (targetIndex < 0 || targetIndex >= activeQuestions.length) return;
+      if (targetIndex === currentIndex) return;
+      flushCurrentQuestionTime();
+      const targetQ = activeQuestions[targetIndex];
+      setCurrentLiveElapsedMs(targetQ ? (attempts[targetQ.id]?.elapsedMs ?? 0) : 0);
+      setCurrentIndex(targetIndex);
+    },
+    [activeQuestions, currentIndex, flushCurrentQuestionTime, attempts]
+  );
+
+  // 選擇選項
+  const handleSelectOption = useCallback(
+    (optKey: OptionKey) => {
+      if (!currentQuestion) return;
+      const existing = attempts[currentQuestion.id];
+      // 單題練習模式下若已送出批改，不再更改選項
+      if (mode === "practice" && existing?.isSubmitted) return;
+
+      setAttempts((prev) => {
+        const curr = prev[currentQuestion.id];
+        if (!curr) return prev;
+        return {
+          ...prev,
+          [currentQuestion.id]: {
+            ...curr,
+            selectedOption: optKey,
+            isCorrect: optKey === currentQuestion.answer,
+          },
+        };
+      });
+    },
+    [currentQuestion, attempts, mode]
+  );
+
+  // 單題練習模式：送出當前題目答案並立即顯示對錯
+  const handleSubmitPracticeAnswer = useCallback(() => {
+    if (!currentQuestion || mode !== "practice") return;
+    const existing = attempts[currentQuestion.id];
+    if (!existing || existing.selectedOption === null || existing.isSubmitted) {
+      return;
+    }
+
+    // 結算至按下送出瞬間的思考耗時
+    const now = performance.now();
+    const deltaMs =
+      questionStartRef.current !== null
+        ? Math.max(0, Math.round(now - questionStartRef.current))
+        : 0;
+    questionStartRef.current = null;
+
+    const updatedElapsed = existing.elapsedMs + deltaMs;
+    setCurrentLiveElapsedMs(updatedElapsed);
+
+    setAttempts((prev) => {
+      const curr = prev[currentQuestion.id];
+      if (!curr) return prev;
+      return {
+        ...prev,
+        [currentQuestion.id]: {
+          ...curr,
+          isSubmitted: true,
+          isCorrect: curr.selectedOption === currentQuestion.answer,
+          elapsedMs: updatedElapsed,
+        },
+      };
+    });
+  }, [currentQuestion, mode, attempts]);
+
+  // 切換不確定標記 (Flag)
+  const handleToggleFlag = useCallback(() => {
+    if (!currentQuestion) return;
+    setAttempts((prev) => {
+      const curr = prev[currentQuestion.id];
+      if (!curr) return prev;
+      return {
+        ...prev,
+        [currentQuestion.id]: {
+          ...curr,
+          isFlagged: !curr.isFlagged,
+        },
+      };
+    });
+  }, [currentQuestion]);
+
+  // 鍵盤快捷鍵支援 (A~E / 1~5 選擇選項，左右方向鍵換題，F 標記，Enter 送出或下一題)
+  useEffect(() => {
+    if (phase !== "active" || showSubmitConfirmModal) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      const keyUpper = e.key.toUpperCase();
+      const keyMap: Record<string, OptionKey> = {
+        A: "A",
+        B: "B",
+        C: "C",
+        D: "D",
+        E: "E",
+        "1": "A",
+        "2": "B",
+        "3": "C",
+        "4": "D",
+        "5": "E",
+      };
+
+      const mappedOpt = keyMap[keyUpper];
+      if (mappedOpt && currentQuestion?.options[mappedOpt] !== undefined) {
+        e.preventDefault();
+        handleSelectOption(mappedOpt);
+        return;
+      }
+
+      if (keyUpper === "F") {
+        e.preventDefault();
+        handleToggleFlag();
+        return;
+      }
+
+      if (e.key === "ArrowLeft" && currentIndex > 0) {
+        e.preventDefault();
+        goToQuestion(currentIndex - 1);
+        return;
+      }
+
+      if (e.key === "ArrowRight" && currentIndex < activeQuestions.length - 1) {
+        e.preventDefault();
+        goToQuestion(currentIndex + 1);
+        return;
+      }
+
+      if (e.key === "Enter" && mode === "practice") {
+        e.preventDefault();
+        if (!currentAttempt?.isSubmitted && currentAttempt?.selectedOption) {
+          handleSubmitPracticeAnswer();
+        } else if (
+          currentAttempt?.isSubmitted &&
+          currentIndex < activeQuestions.length - 1
+        ) {
+          goToQuestion(currentIndex + 1);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    phase,
+    showSubmitConfirmModal,
+    currentQuestion,
+    currentIndex,
+    activeQuestions.length,
+    mode,
+    currentAttempt,
+    handleSelectOption,
+    handleToggleFlag,
+    goToQuestion,
+    handleSubmitPracticeAnswer,
+  ]);
+
+  // 答題進度統計
+  const progressStats = useMemo(() => {
+    let answered = 0;
+    let flagged = 0;
+    for (const q of activeQuestions) {
+      const att = attempts[q.id];
+      if (att?.selectedOption !== null && att?.selectedOption !== undefined) {
+        answered++;
+      }
+      if (att?.isFlagged) {
+        flagged++;
+      }
+    }
+    const total = activeQuestions.length;
+    return {
+      total,
+      answered,
+      unanswered: total - answered,
+      flagged,
+      percent: total > 0 ? Math.round((answered / total) * 100) : 0,
+    };
+  }, [activeQuestions, attempts]);
+
+  // 結算成績統計
+  const summaryResult = useMemo(
+    () => calculateQuizSummary(activeQuestions, attempts),
+    [activeQuestions, attempts]
+  );
+
+  // 耗時最久的前 3 題
+  const slowestQuestions = useMemo(() => {
+    if (phase !== "summary") return [];
+    return [...activeQuestions]
+      .sort(
+        (a, b) =>
+          (attempts[b.id]?.elapsedMs ?? 0) - (attempts[a.id]?.elapsedMs ?? 0)
+      )
+      .slice(0, 3)
+      .filter((q) => (attempts[q.id]?.elapsedMs ?? 0) > 0);
+  }, [phase, activeQuestions, attempts]);
+
+  // 結算頁篩選與排序後的檢討題目列表
+  const reviewedQuestions = useMemo(() => {
+    const filtered = activeQuestions.filter((q) => {
+      const att = attempts[q.id];
+      if (reviewFilter === "wrong_or_unanswered") {
+        return !att || att.selectedOption !== q.answer;
+      }
+      if (reviewFilter === "flagged") {
+        return Boolean(att?.isFlagged);
+      }
+      return true;
+    });
+
+    if (reviewSort === "time_desc") {
+      return [...filtered].sort(
+        (a, b) =>
+          (attempts[b.id]?.elapsedMs ?? 0) - (attempts[a.id]?.elapsedMs ?? 0)
+      );
+    }
+    return filtered;
+  }, [activeQuestions, attempts, reviewFilter, reviewSort]);
+
+  // 針對本次答錯或未答的題目重新開始單題練習
+  const handleRetryWrongQuestions = () => {
+    const wrongIds = new Set(
+      activeQuestions
+        .filter((q) => attempts[q.id]?.selectedOption !== q.answer)
+        .map((q) => q.id)
+    );
+    const originalWrongQuestions = exam.questions.filter((q) =>
+      wrongIds.has(q.id)
+    );
+    if (originalWrongQuestions.length === 0) return;
+
+    setMode("practice");
+    startQuizWithQuestions(originalWrongQuestions, {
+      mode: "practice",
+      questionOrder,
+      optionOrder,
+      selectedDifficulties: [...ALL_DIFFICULTY_LEVELS],
+    });
+  };
+
+  const toggleDifficultySelection = (lvl: DifficultyLevel) => {
+    setSelectedDifficulties((prev) =>
+      prev.includes(lvl) ? prev.filter((item) => item !== lvl) : [...prev, lvl]
+    );
+  };
+
+  // ==================== 畫面渲染：1. 設定階段 ====================
+  if (phase === "setup") {
+    return (
+      <div className="min-h-screen bg-slate-50 pb-16">
+        <header className="border-b border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+            <Link
+              to={`/exams/${exam.examId}`}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-indigo-600"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              返回考卷閱覽
+            </Link>
+            <Link
+              to="/"
+              className="text-xs font-medium text-slate-500 hover:text-slate-800"
+            >
+              題庫管理中心
+            </Link>
           </div>
-          <h1 className="mt-4 text-lg font-bold text-slate-900">
-            {exam.title}
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            刷題與模擬測驗系統將於 Step 3 實作完成。
-          </p>
-        </div>
+        </header>
+
+        <main className="mx-auto max-w-4xl space-y-6 px-6 pt-8">
+          {/* 考卷標題卡片 */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">
+                {exam.categoryTitle}
+              </span>
+              <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                #{exam.examId}
+              </span>
+              <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                總題數 {exam.totalQuestions} 題
+              </span>
+            </div>
+            <h1 className="mt-2 text-xl font-bold text-slate-900">
+              {exam.title}
+            </h1>
+          </div>
+
+          {/* 模式選擇 */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
+              <SlidersHorizontal className="h-5 w-5 text-indigo-600" />
+              步驟 1：選擇刷題模式
+            </h2>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setMode("practice")}
+                className={`flex flex-col items-start rounded-2xl border-2 p-5 text-left transition ${
+                  mode === "practice"
+                    ? "border-indigo-600 bg-indigo-50/40 shadow-xs"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span className="inline-flex items-center gap-2 text-base font-bold text-slate-900">
+                    <Sparkles className="h-5 w-5 text-indigo-600" />
+                    單題練習模式
+                  </span>
+                  {mode === "practice" && (
+                    <span className="rounded-full bg-indigo-600 px-2.5 py-0.5 text-xs font-semibold text-white">
+                      目前選擇
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                  每次顯示一題，選好並送出答案後立即批改對錯、顯示標準答案與全站選答率統計。支援指定特定難度的題目練習。
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMode("mock")}
+                className={`flex flex-col items-start rounded-2xl border-2 p-5 text-left transition ${
+                  mode === "mock"
+                    ? "border-indigo-600 bg-indigo-50/40 shadow-xs"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span className="inline-flex items-center gap-2 text-base font-bold text-slate-900">
+                    <Timer className="h-5 w-5 text-indigo-600" />
+                    模擬考模式
+                  </span>
+                  {mode === "mock" && (
+                    <span className="rounded-full bg-indigo-600 px-2.5 py-0.5 text-xs font-semibold text-white">
+                      目前選擇
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                  仿真實考場體驗，支援倒數計時、不確定題目標記 (Flag) 與日曆式答題卡跳轉，交卷後統一計分、分析各題耗時與檢討錯題。
+                </p>
+              </button>
+            </div>
+          </section>
+
+          {/* 通用設定：題目順序與選項順序 */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
+              <Shuffle className="h-5 w-5 text-indigo-600" />
+              步驟 2：出題與選項順序設定（通用）
+            </h2>
+
+            <div className="mt-4 grid gap-6 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  題目出現順序
+                </label>
+                <div className="mt-2 grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setQuestionOrder("sequential")}
+                    className={`rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ${
+                      questionOrder === "sequential"
+                        ? "border-indigo-600 bg-indigo-600 text-white"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    依原題號順序 (1 → {exam.totalQuestions})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuestionOrder("random")}
+                    className={`rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ${
+                      questionOrder === "random"
+                        ? "border-indigo-600 bg-indigo-600 text-white"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    🔀 隨機打亂題目順序
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  選項 (A)(B)(C)(D) 順序
+                </label>
+                <div className="mt-2 grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setOptionOrder("sequential")}
+                    className={`rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ${
+                      optionOrder === "sequential"
+                        ? "border-indigo-600 bg-indigo-600 text-white"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    依原選項順序
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOptionOrder("random")}
+                    className={`rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ${
+                      optionOrder === "random"
+                        ? "border-indigo-600 bg-indigo-600 text-white"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    🔀 隨機打亂選項（防背位置）
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[11px] text-slate-500">
+                  * 打亂選項時，系統會自動重新對齊正確答案與全站選答率統計。
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* 模式專屬設定 */}
+          {mode === "practice" ? (
+            <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-bold text-slate-900">
+                  步驟 3：單題練習模式專屬選項
+                </h2>
+                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                  符合篩選題數：{matchingQuestionCount} / {exam.totalQuestions} 題
+                </span>
+              </div>
+
+              {/* 考題難度指定（多選） */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">
+                    指定練習考題難度（可多選）
+                  </label>
+                  <div className="flex gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedDifficulties([...ALL_DIFFICULTY_LEVELS])
+                      }
+                      className="font-medium text-indigo-600 hover:underline"
+                    >
+                      全選難度
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedDifficulties(["困難", "非常困難"])
+                      }
+                      className="font-medium text-amber-700 hover:underline"
+                    >
+                      只選困難＋非常困難
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-2.5 flex flex-wrap gap-2.5">
+                  {ALL_DIFFICULTY_LEVELS.map((lvl) => {
+                    const isSelected = selectedDifficulties.includes(lvl);
+                    const count = difficultyCounts[lvl] ?? 0;
+                    return (
+                      <button
+                        key={lvl}
+                        type="button"
+                        onClick={() => toggleDifficultySelection(lvl)}
+                        className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${
+                          isSelected
+                            ? "border-indigo-600 bg-indigo-50 text-indigo-800 shadow-2xs"
+                            : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          readOnly
+                          checked={isSelected}
+                          className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600"
+                        />
+                        <span>{lvl}</span>
+                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">
+                          {count} 題
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 作答時是否顯示考題難度 */}
+              <div className="border-t border-slate-100 pt-4">
+                <label className="flex cursor-pointer items-center justify-between gap-4">
+                  <div>
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                      {showDifficultyInPractice ? (
+                        <Eye className="h-4 w-4 text-indigo-600" />
+                      ) : (
+                        <EyeOff className="h-4 w-4 text-slate-400" />
+                      )}
+                      作答過程中顯示考題難易度標籤
+                    </span>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      若關閉，作答時將隱藏「簡單／困難」標籤以免影響作答心理，送出答案後才會顯示。
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={showDifficultyInPractice}
+                    onChange={(e) =>
+                      setShowDifficultyInPractice(e.target.checked)
+                    }
+                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                </label>
+              </div>
+            </section>
+          ) : (
+            <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
+              <h2 className="text-base font-bold text-slate-900">
+                步驟 3：模擬考模式專屬選項
+              </h2>
+
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                <label className="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={enableTimeLimit}
+                    onChange={(e) => setEnableTimeLimit(e.target.checked)}
+                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div>
+                    <span className="text-sm font-semibold text-slate-800">
+                      啟用模擬考倒數計時限制
+                    </span>
+                    <p className="text-xs text-slate-500">
+                      倒數時間歸零時系統將自動停止作答並交卷結算成績
+                    </p>
+                  </div>
+                </label>
+
+                {enableTimeLimit && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[30, 50, 60, 75, 90].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setTimeLimitMinutes(preset)}
+                        className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
+                          timeLimitMinutes === preset
+                            ? "border-indigo-600 bg-indigo-600 text-white"
+                            : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        {preset} 分鐘
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={1}
+                        max={300}
+                        value={timeLimitMinutes}
+                        onChange={(e) =>
+                          setTimeLimitMinutes(
+                            Math.max(1, Number(e.target.value) || 60)
+                          )
+                        }
+                        aria-label="自訂測驗分鐘數"
+                        className="w-20 rounded-xl border border-slate-300 px-3 py-1.5 text-center text-sm font-bold text-slate-900 focus:border-indigo-500 focus:outline-none"
+                      />
+                      <span className="text-xs font-medium text-slate-600">
+                        分鐘
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* 啟動按鈕 */}
+          <div className="flex items-center justify-end gap-4">
+            {matchingQuestionCount === 0 && (
+              <p className="text-xs font-medium text-rose-600">
+                ⚠️ 目前勾選的難度沒有對應題目，請至少勾選一個含有題目的難度。
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={matchingQuestionCount === 0}
+              onClick={() => startQuizWithQuestions(exam.questions)}
+              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Play className="h-4 w-4" />
+              開始{mode === "practice" ? "單題練習" : "模擬測驗"} (
+              {matchingQuestionCount} 題)
+            </button>
+          </div>
+        </main>
       </div>
+    );
+  }
+
+  // ==================== 畫面渲染：2. 作答進行中階段 ====================
+  if (phase === "active" && currentQuestion) {
+    const isAnswered =
+      currentAttempt?.selectedOption !== null &&
+      currentAttempt?.selectedOption !== undefined;
+    const isPracticeSubmitted =
+      mode === "practice" && Boolean(currentAttempt?.isSubmitted);
+    const shouldShowDifficulty =
+      mode === "mock" || showDifficultyInPractice || isPracticeSubmitted;
+    const isLowTimeWarning =
+      remainingSeconds !== null && remainingSeconds <= 300;
+
+    return (
+      <div className="min-h-screen bg-slate-50 pb-20">
+        {/* 吸頂作答狀態列 */}
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 shadow-2xs backdrop-blur-xs">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-3.5">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  flushCurrentQuestionTime();
+                  setPhase("setup");
+                }}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                重設選項
+              </button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-bold text-white">
+                    {mode === "practice" ? "單題練習模式" : "模擬考模式"}
+                  </span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    進度：{currentIndex + 1} / {activeQuestions.length} 題
+                  </span>
+                </div>
+                <p className="mt-0.5 line-clamp-1 max-w-md text-xs text-slate-500">
+                  {exam.title}
+                </p>
+              </div>
+            </div>
+
+            {/* 倒數計時器與交卷按鈕 */}
+            <div className="flex items-center gap-3">
+              {mode === "mock" && remainingSeconds !== null && (
+                <div
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 font-mono text-sm font-bold ${
+                    isLowTimeWarning
+                      ? "animate-pulse border-rose-300 bg-rose-50 text-rose-700"
+                      : "border-slate-200 bg-slate-100 text-slate-800"
+                  }`}
+                >
+                  <Timer className="h-4 w-4" />
+                  剩餘時間：{formatCountdown(remainingSeconds)}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (mode === "mock") {
+                    setShowSubmitConfirmModal(true);
+                  } else {
+                    finalizeQuiz(false);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-2xs transition hover:bg-emerald-700"
+              >
+                <Send className="h-3.5 w-3.5" />
+                {mode === "mock" ? "交卷結算成績" : "結束練習並看統計"}
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto grid max-w-6xl gap-6 px-6 pt-6 lg:grid-cols-12">
+          {/* 左側主作答卡片 (佔 8 欄) */}
+          <div className="space-y-5 lg:col-span-8">
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
+              {/* 題號、難度、單題即時耗時與標記按鈕 */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex h-7 items-center justify-center rounded-lg bg-slate-900 px-3 text-xs font-bold text-white">
+                    第 {currentIndex + 1} 題
+                  </span>
+                  {questionOrder === "random" && (
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                      (原卷第 {currentQuestion.questionNumber} 題)
+                    </span>
+                  )}
+                  {shouldShowDifficulty && (
+                    <span
+                      className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${DIFFICULTY_BADGE_STYLE[currentQuestion.difficulty]}`}
+                    >
+                      {currentQuestion.difficulty}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-medium text-slate-600"
+                    title="在此題累計花費的思考時間"
+                  >
+                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                    本題耗時：{formatDuration(currentLiveElapsedMs)}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleToggleFlag}
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-semibold transition ${
+                      currentAttempt?.isFlagged
+                        ? "border-amber-300 bg-amber-100 text-amber-900"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <Flag
+                      className={`h-3.5 w-3.5 ${
+                        currentAttempt?.isFlagged
+                          ? "fill-amber-500 text-amber-600"
+                          : ""
+                      }`}
+                    />
+                    {currentAttempt?.isFlagged ? "已標記不確定" : "標記不確定"}
+                  </button>
+                </div>
+              </div>
+
+              {/* 題幹與附圖 */}
+              <div className="mt-5 space-y-4">
+                <p className="text-base leading-relaxed font-medium whitespace-pre-line text-slate-900">
+                  {currentQuestion.question}
+                </p>
+
+                {currentQuestion.images.length > 0 && (
+                  <div className="flex flex-wrap gap-4">
+                    {currentQuestion.images.map((imgSrc, imgIdx) => (
+                      <img
+                        key={imgIdx}
+                        src={imgSrc}
+                        alt={`題目附圖 ${imgIdx + 1}`}
+                        className="max-h-80 rounded-xl border border-slate-200 bg-slate-50 object-contain p-2"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 選項列表 */}
+              <div className="mt-6 space-y-2.5">
+                {OPTION_KEYS.map((optKey) => {
+                  const optText = currentQuestion.options[optKey];
+                  if (optText === undefined) return null;
+
+                  const isSelected = currentAttempt?.selectedOption === optKey;
+                  const isCorrectOpt = currentQuestion.answer === optKey;
+
+                  let cardStyle =
+                    "border-slate-200 bg-white text-slate-800 hover:border-indigo-300 hover:bg-indigo-50/30";
+                  let badgeStyle = "bg-slate-100 text-slate-700";
+
+                  if (isPracticeSubmitted) {
+                    if (isCorrectOpt) {
+                      cardStyle =
+                        "border-emerald-400 bg-emerald-50/80 text-emerald-950 font-semibold";
+                      badgeStyle = "bg-emerald-600 text-white";
+                    } else if (isSelected && !isCorrectOpt) {
+                      cardStyle =
+                        "border-rose-400 bg-rose-50/80 text-rose-950 font-semibold";
+                      badgeStyle = "bg-rose-600 text-white";
+                    } else {
+                      cardStyle = "border-slate-200 bg-slate-50/50 text-slate-500";
+                    }
+                  } else if (isSelected) {
+                    cardStyle =
+                      "border-indigo-600 bg-indigo-50/70 text-indigo-950 font-semibold ring-1 ring-indigo-600";
+                    badgeStyle = "bg-indigo-600 text-white";
+                  }
+
+                  return (
+                    <button
+                      key={optKey}
+                      type="button"
+                      disabled={isPracticeSubmitted}
+                      onClick={() => handleSelectOption(optKey)}
+                      className={`flex w-full items-start gap-3.5 rounded-xl border p-4 text-left text-sm transition ${cardStyle}`}
+                    >
+                      <span
+                        className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold transition ${badgeStyle}`}
+                      >
+                        {optKey}
+                      </span>
+                      <div className="flex-1 space-y-1">
+                        <span className="block leading-relaxed">{optText}</span>
+                        {isPracticeSubmitted && (
+                          <div className="flex items-center gap-2 pt-1 text-xs font-normal text-slate-500">
+                            <span>
+                              全站選答率：{currentQuestion.stats[optKey] ?? 0}%
+                            </span>
+                            {optionOrder === "random" &&
+                              currentQuestion.optionMapping[optKey] && (
+                                <span className="text-slate-400">
+                                  (原卷選項{" "}
+                                  {currentQuestion.optionMapping[optKey]})
+                                </span>
+                              )}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 單題練習模式：立即批改結果回饋面板 */}
+              {mode === "practice" && isPracticeSubmitted && (
+                <div
+                  className={`mt-5 rounded-xl border p-4 ${
+                    currentAttempt?.isCorrect
+                      ? "border-emerald-200 bg-emerald-50/70 text-emerald-900"
+                      : "border-rose-200 bg-rose-50/70 text-rose-900"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 font-bold">
+                      {currentAttempt?.isCorrect ? (
+                        <>
+                          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                          <span>答對了！正確答案為 ({currentQuestion.answer})</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-5 w-5 text-rose-600" />
+                          <span>
+                            答錯了！您選擇 ({currentAttempt?.selectedOption}
+                            )，正確答案為 ({currentQuestion.answer})
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <span className="text-xs font-medium">
+                      全站答對率：{Math.round(currentQuestion.correctRate * 100)}
+                      % · 本題思考耗時：{formatDuration(currentLiveElapsedMs)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 底部換題與送出控制列 */}
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  disabled={currentIndex === 0}
+                  onClick={() => goToQuestion(currentIndex - 1)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  上一題
+                </button>
+
+                <div className="flex items-center gap-2.5">
+                  {mode === "practice" && !isPracticeSubmitted && (
+                    <button
+                      type="button"
+                      disabled={!isAnswered}
+                      onClick={handleSubmitPracticeAnswer}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      確認送出答案 (Enter)
+                    </button>
+                  )}
+
+                  {currentIndex < activeQuestions.length - 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => goToQuestion(currentIndex + 1)}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
+                        mode === "mock" || isPracticeSubmitted
+                          ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                          : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      {mode === "mock" && !isAnswered ? "跳過 / 下一題" : "下一題"}
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (mode === "mock") {
+                          setShowSubmitConfirmModal(true);
+                        } else {
+                          finalizeQuiz(false);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700"
+                    >
+                      <Trophy className="h-4 w-4" />
+                      {mode === "mock" ? "完成作答並交卷" : "查看練習總結"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </article>
+
+            {/* 鍵盤快捷鍵提示 */}
+            <p className="text-center text-xs text-slate-400">
+              💡 支援鍵盤操作：按 <kbd className="rounded border bg-white px-1.5 py-0.5">A</kbd>～<kbd className="rounded border bg-white px-1.5 py-0.5">D</kbd> 或 <kbd className="rounded border bg-white px-1.5 py-0.5">1</kbd>～<kbd className="rounded border bg-white px-1.5 py-0.5">4</kbd> 選答案、<kbd className="rounded border bg-white px-1.5 py-0.5">F</kbd> 標記不確定、<kbd className="rounded border bg-white px-1.5 py-0.5">←</kbd> <kbd className="rounded border bg-white px-1.5 py-0.5">→</kbd> 切換題目
+            </p>
+          </div>
+
+          {/* 右側：日曆網格樣式的答題完成度面板 (佔 4 欄) */}
+          <aside className="lg:col-span-4">
+            <div className="sticky top-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <LayoutGrid className="h-4 w-4 text-indigo-600" />
+                  答題完成度總覽
+                </h2>
+                <span className="text-xs font-bold text-indigo-600">
+                  {progressStats.percent}% ({progressStats.answered}/
+                  {progressStats.total})
+                </span>
+              </div>
+
+              {/* 進度條 */}
+              <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-indigo-600 transition-all duration-300"
+                  style={{ width: `${progressStats.percent}%` }}
+                />
+              </div>
+
+              {/* 圖例說明 */}
+              <div className="mt-3.5 flex flex-wrap gap-3 border-b border-slate-100 pb-3 text-[11px] font-medium text-slate-600">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded bg-indigo-600" />
+                  已答 ({progressStats.answered})
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded border border-slate-300 bg-slate-50" />
+                  未答 ({progressStats.unanswered})
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded border border-amber-400 bg-amber-100" />
+                  標記不確定 ({progressStats.flagged})
+                </span>
+              </div>
+
+              {/* 日曆式題號網格表格 */}
+              <div className="mt-4 grid max-h-96 grid-cols-5 gap-2 overflow-y-auto p-0.5 sm:grid-cols-8 lg:grid-cols-5">
+                {activeQuestions.map((q, idx) => {
+                  const att = attempts[q.id];
+                  const isCurrent = idx === currentIndex;
+                  const hasAns =
+                    att?.selectedOption !== null &&
+                    att?.selectedOption !== undefined;
+                  const isFlagged = Boolean(att?.isFlagged);
+
+                  let cellStyle =
+                    "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100";
+
+                  if (mode === "practice" && att?.isSubmitted) {
+                    cellStyle = att.isCorrect
+                      ? "border-emerald-500 bg-emerald-600 text-white"
+                      : "border-rose-500 bg-rose-600 text-white";
+                  } else if (isFlagged && hasAns) {
+                    cellStyle =
+                      "border-amber-500 bg-amber-100 text-amber-950 font-bold";
+                  } else if (isFlagged) {
+                    cellStyle =
+                      "border-amber-400 bg-amber-50 text-amber-800 font-bold";
+                  } else if (hasAns) {
+                    cellStyle = "border-indigo-600 bg-indigo-600 text-white";
+                  }
+
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onClick={() => goToQuestion(idx)}
+                      className={`relative flex h-10 items-center justify-center rounded-xl border text-xs font-semibold transition ${cellStyle} ${
+                        isCurrent
+                          ? "ring-2 ring-indigo-600 ring-offset-2"
+                          : ""
+                      }`}
+                      title={`跳轉至第 ${idx + 1} 題${
+                        isFlagged ? " (已標記不確定)" : ""
+                      }`}
+                    >
+                      {idx + 1}
+                      {isFlagged && (
+                        <span
+                          className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500 text-[9px] text-white shadow-2xs"
+                          aria-hidden="true"
+                        >
+                          !
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </aside>
+        </main>
+
+        {/* 模擬考交卷確認視窗 */}
+        <ConfirmModal
+          open={showSubmitConfirmModal}
+          title="確定要交卷並結算成績嗎？"
+          description={
+            progressStats.unanswered > 0 || progressStats.flagged > 0
+              ? `目前尚有 ${progressStats.unanswered} 題未作答、${progressStats.flagged} 題標記為不確定。確定要現在送出試卷嗎？`
+              : "您已完成所有題目的作答，確定要現在送出試卷並檢視成績與錯題解析嗎？"
+          }
+          confirmLabel="確定交卷"
+          cancelLabel="繼續檢查作答"
+          variant="primary"
+          onConfirm={() => finalizeQuiz(false)}
+          onClose={() => setShowSubmitConfirmModal(false)}
+        />
+      </div>
+    );
+  }
+
+  // ==================== 畫面渲染：3. 交卷結算與錯題檢討階段 ====================
+  return (
+    <div className="min-h-screen bg-slate-50 pb-20">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <Link
+            to={`/exams/${exam.examId}`}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            返回考卷閱覽
+          </Link>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {summaryResult.wrongCount + summaryResult.unansweredCount > 0 && (
+              <button
+                type="button"
+                onClick={handleRetryWrongQuestions}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-2xs transition hover:bg-amber-700"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                針對本次錯題與未答重練 (
+                {summaryResult.wrongCount + summaryResult.unansweredCount} 題)
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setPhase("setup")}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-2xs transition hover:bg-indigo-700"
+            >
+              <Play className="h-3.5 w-3.5" />
+              重新設定並再測驗一次
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl space-y-6 px-6 pt-8">
+        {isAutoSubmittedByTimeout && (
+          <div className="flex items-center gap-2.5 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3.5 text-sm font-semibold text-amber-900">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
+            ⏰ 測驗規定時間已到，系統已自動為您停止作答並完成交卷結算！
+          </div>
+        )}
+
+        {/* 成績與耗時總覽卡片 */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
+          <div className="flex flex-col justify-between gap-6 border-b border-slate-100 pb-6 md:flex-row md:items-center">
+            <div className="space-y-1">
+              <span className="rounded-md bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+                {mode === "mock" ? "模擬考結算報告" : "單題練習結算報告"}
+              </span>
+              <h1 className="text-xl font-bold text-slate-900">{exam.title}</h1>
+              <p className="text-xs text-slate-500">
+                題目順序：{questionOrder === "random" ? "隨機打亂" : "依原題號"}{" "}
+                · 選項順序：{optionOrder === "random" ? "隨機打亂" : "依原順序"}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <span className="block text-xs font-medium text-slate-500">
+                  本次測驗得分
+                </span>
+                <span
+                  className={`text-4xl font-extrabold ${
+                    summaryResult.score >= 70
+                      ? "text-emerald-600"
+                      : "text-amber-600"
+                  }`}
+                >
+                  {summaryResult.score}
+                  <span className="ml-1 text-base font-semibold">分</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 數據統計網格 */}
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-5">
+            <div className="rounded-xl bg-emerald-50/70 p-4">
+              <span className="text-xs font-medium text-emerald-700">
+                答對題數
+              </span>
+              <p className="mt-1 text-2xl font-bold text-emerald-800">
+                {summaryResult.correctCount}{" "}
+                <span className="text-xs font-normal">
+                  / {summaryResult.totalQuestions}
+                </span>
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-rose-50/70 p-4">
+              <span className="text-xs font-medium text-rose-700">
+                答錯題數
+              </span>
+              <p className="mt-1 text-2xl font-bold text-rose-800">
+                {summaryResult.wrongCount}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-slate-100/80 p-4">
+              <span className="text-xs font-medium text-slate-600">
+                未作答題數
+              </span>
+              <p className="mt-1 text-2xl font-bold text-slate-800">
+                {summaryResult.unansweredCount}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-indigo-50/70 p-4">
+              <span className="text-xs font-medium text-indigo-700">
+                總作答耗時
+              </span>
+              <p className="mt-1 text-lg font-bold text-indigo-900">
+                {formatDuration(summaryResult.totalElapsedMs)}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-indigo-50/70 p-4">
+              <span className="text-xs font-medium text-indigo-700">
+                平均每題耗時
+              </span>
+              <p className="mt-1 text-lg font-bold text-indigo-900">
+                {formatDuration(summaryResult.averageElapsedMs)}
+              </p>
+            </div>
+          </div>
+
+          {/* 最耗時題目提醒 */}
+          {slowestQuestions.length > 0 && (
+            <div className="mt-5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+              <span className="flex items-center gap-1 font-semibold text-slate-700">
+                <Clock className="h-3.5 w-3.5 text-indigo-600" />
+                最耗時題目排行：
+              </span>
+              {slowestQuestions.map((q) => (
+                <a
+                  key={q.id}
+                  href={`#review-q-${q.id}`}
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600"
+                >
+                  第 {q.displayIndex} 題 (
+                  {formatDuration(attempts[q.id]?.elapsedMs ?? 0)})
+                </a>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* 錯題檢討與逐題耗時明細 */}
+        <section className="space-y-4">
+          <div className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs sm:flex-row sm:items-center">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setReviewFilter("all")}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
+                  reviewFilter === "all"
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                全部題目 ({activeQuestions.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReviewFilter("wrong_or_unanswered")}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
+                  reviewFilter === "wrong_or_unanswered"
+                    ? "bg-rose-600 text-white"
+                    : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                }`}
+              >
+                只看錯題與未答 (
+                {summaryResult.wrongCount + summaryResult.unansweredCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReviewFilter("flagged")}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
+                  reviewFilter === "flagged"
+                    ? "bg-amber-600 text-white"
+                    : "bg-amber-50 text-amber-800 hover:bg-amber-100"
+                }`}
+              >
+                只看標記不確定 ({progressStats.flagged})
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-slate-500">排序：</span>
+              <select
+                value={reviewSort}
+                onChange={(e) => setReviewSort(e.target.value as ReviewSort)}
+                aria-label="檢討題目排序方式"
+                className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="index">依測驗題號順序</option>
+                <option value="time_desc">依各題耗時（由多到少）</option>
+              </select>
+            </div>
+          </div>
+
+          {reviewedQuestions.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
+              🎉 沒有符合此篩選條件的題目！
+            </div>
+          ) : (
+            reviewedQuestions.map((q) => {
+              const att = attempts[q.id];
+              const userSelected = att?.selectedOption ?? null;
+              const isCorrect = userSelected === q.answer;
+              const elapsedMs = att?.elapsedMs ?? 0;
+              const isSlowQuestion =
+                summaryResult.averageElapsedMs > 0 &&
+                elapsedMs > summaryResult.averageElapsedMs * 1.5 &&
+                elapsedMs >= 5000;
+
+              return (
+                <article
+                  key={q.id}
+                  id={`review-q-${q.id}`}
+                  className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs"
+                >
+                  {/* 題頭：對錯狀態、題號、難度、本題耗時 */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isCorrect ? (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          答對
+                        </span>
+                      ) : userSelected === null ? (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700">
+                          <HelpCircle className="h-3.5 w-3.5" />
+                          未作答
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-800">
+                          <XCircle className="h-3.5 w-3.5" />
+                          答錯
+                        </span>
+                      )}
+
+                      <span className="text-sm font-bold text-slate-900">
+                        第 {q.displayIndex} 題
+                      </span>
+                      {questionOrder === "random" && (
+                        <span className="text-xs text-slate-400">
+                          (原卷第 {q.questionNumber} 題)
+                        </span>
+                      )}
+
+                      <span
+                        className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${DIFFICULTY_BADGE_STYLE[q.difficulty]}`}
+                      >
+                        {q.difficulty}
+                      </span>
+
+                      {att?.isFlagged && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                          <Flag className="h-3 w-3 fill-amber-500" />
+                          已標記
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 font-mono font-medium ${
+                          isSlowQuestion
+                            ? "bg-amber-100 text-amber-900"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        <Clock className="h-3.5 w-3.5" />
+                        耗時：{formatDuration(elapsedMs)}
+                        {isSlowQuestion && " (耗時較長)"}
+                      </span>
+                      <span className="text-slate-500">
+                        全站答對率：{Math.round(q.correctRate * 100)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 題幹與附圖 */}
+                  <div className="mt-4 space-y-3">
+                    <p className="text-base leading-relaxed font-medium whitespace-pre-line text-slate-900">
+                      {q.question}
+                    </p>
+                    {q.images.length > 0 && (
+                      <div className="flex flex-wrap gap-4">
+                        {q.images.map((imgSrc, imgIdx) => (
+                          <img
+                            key={imgIdx}
+                            src={imgSrc}
+                            alt={`第 ${q.displayIndex} 題附圖`}
+                            loading="lazy"
+                            className="max-h-80 rounded-xl border border-slate-200 bg-slate-50 object-contain p-2"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 選項與作答比對 */}
+                  <div className="mt-4 space-y-2">
+                    {OPTION_KEYS.map((optKey) => {
+                      const optText = q.options[optKey];
+                      if (optText === undefined) return null;
+
+                      const isAns = q.answer === optKey;
+                      const isUserPick = userSelected === optKey;
+                      const pct = q.stats[optKey] ?? 0;
+
+                      let rowClass =
+                        "border-slate-200 bg-slate-50/40 text-slate-700";
+                      if (isAns) {
+                        rowClass =
+                          "border-emerald-300 bg-emerald-50/80 text-emerald-950 font-semibold";
+                      } else if (isUserPick && !isAns) {
+                        rowClass =
+                          "border-rose-300 bg-rose-50/80 text-rose-950 font-semibold";
+                      }
+
+                      return (
+                        <div
+                          key={optKey}
+                          className={`flex flex-col justify-between gap-2 rounded-xl border px-4 py-3 text-sm sm:flex-row sm:items-center ${rowClass}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span
+                              className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                                isAns
+                                  ? "bg-emerald-600 text-white"
+                                  : isUserPick
+                                    ? "bg-rose-600 text-white"
+                                    : "bg-slate-200 text-slate-700"
+                              }`}
+                            >
+                              {optKey}
+                            </span>
+                            <span className="leading-relaxed">{optText}</span>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
+                            {isAns && (
+                              <span className="rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">
+                                正確答案
+                              </span>
+                            )}
+                            {isUserPick && !isAns && (
+                              <span className="rounded-md bg-rose-600 px-2 py-0.5 text-[11px] font-bold text-white">
+                                您的選擇
+                              </span>
+                            )}
+                            {isUserPick && isAns && (
+                              <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                                您的選擇
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1 rounded-md bg-white/90 px-2 py-0.5 font-mono text-xs text-slate-600">
+                              <BarChart3 className="h-3 w-3 text-slate-400" />
+                              {pct}%
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </section>
+      </main>
     </div>
   );
 }

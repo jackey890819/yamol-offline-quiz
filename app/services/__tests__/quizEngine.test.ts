@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateQuizSummary,
+  formatCountdown,
+  formatDuration,
   prepareQuizQuestions,
   prepareSingleQuestion,
 } from "~/services/quizEngine";
@@ -113,5 +115,15 @@ describe("quizEngine", () => {
     expect(summary.score).toBe(50);
     expect(summary.totalElapsedMs).toBe(20000);
     expect(summary.averageElapsedMs).toBe(10000);
+  });
+
+  it("正確格式化作答耗時與倒數計時字串", () => {
+    expect(formatDuration(8500)).toBe("8.5 秒");
+    expect(formatDuration(12000)).toBe("12 秒");
+    expect(formatDuration(84000)).toBe("1 分 24 秒");
+
+    expect(formatCountdown(3600)).toBe("01:00:00");
+    expect(formatCountdown(125)).toBe("02:05");
+    expect(formatCountdown(0)).toBe("00:00");
   });
 });

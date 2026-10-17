@@ -7,5 +7,7 @@ coverage/
 .DS_Store
 .env
 .env.*
+data/
+public/exam-images/
 test-scrape.js
 exam_140603_parsed.json

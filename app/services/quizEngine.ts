@@ -155,3 +155,34 @@ export function calculateQuizSummary(
     averageElapsedMs,
   };
 }
+
+/**
+ * 將毫秒數格式化為易讀的耗時字串（例如 "8.5 秒" 或 "1 分 24 秒"）
+ */
+export function formatDuration(ms: number): string {
+  const safeMs = Math.max(0, ms);
+  if (safeMs < 60_000) {
+    const sec = (safeMs / 1000).toFixed(1).replace(/\.0$/, "");
+    return `${sec} 秒`;
+  }
+  const totalSeconds = Math.round(safeMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes} 分 ${String(seconds).padStart(2, "0")} 秒`;
+}
+
+/**
+ * 將剩餘秒數格式化為倒數計時字串 (MM:SS 或 HH:MM:SS)
+ */
+export function formatCountdown(remainingSeconds: number): string {
+  const safeSec = Math.max(0, Math.floor(remainingSeconds));
+  const hours = Math.floor(safeSec / 3600);
+  const minutes = Math.floor((safeSec % 3600) / 60);
+  const seconds = safeSec % 60;
+
+  if (hours > 0) {
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
