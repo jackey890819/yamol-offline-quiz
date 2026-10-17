@@ -1,0 +1,51 @@
+/* 模糊遮罩答案效果：預設模糊，滑鼠移過 (:hover) 或鍵盤聚焦 (:focus-within) 時平滑清晰顯示 */
+.blurAnswerContainer {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.blurAnswerContent {
+  filter: blur(7px);
+  opacity: 0.72;
+  transition:
+    filter 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.22s ease;
+}
+
+.blurAnswerContainer:hover .blurAnswerContent,
+.blurAnswerContainer:focus-within .blurAnswerContent,
+.blurAnswerRevealed .blurAnswerContent {
+  filter: blur(0);
+  opacity: 1;
+  user-select: text;
+}
+
+.blurHintBadge {
+  transition: opacity 0.2s ease;
+}
+
+.blurAnswerContainer:hover .blurHintBadge,
+.blurAnswerContainer:focus-within .blurHintBadge,
+.blurAnswerRevealed .blurHintBadge {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 針對首屏以下 (Below the fold) 的大量考題卡片延遲渲染，搭配 contain-intrinsic-size 防止捲軸跳動 */
+.deferredQuestionCard {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 260px;
+}
+
+/* 原生 Modal Dialog 背景與防滾動穿透設定 */
+.modalDialog:modal {
+  overscroll-behavior: contain;
+}
+
+.modalDialog::backdrop {
+  background-color: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
