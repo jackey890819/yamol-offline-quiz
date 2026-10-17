@@ -1,0 +1,11 @@
+node_modules/
+.react-router/
+build/
+dist/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+test-scrape.js
+exam_140603_parsed.json
