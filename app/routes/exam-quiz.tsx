@@ -109,8 +109,9 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
   const [showSubmitConfirmModal, setShowSubmitConfirmModal] =
     useState<boolean>(false);
 
-  // 追蹤當前題目進入時間戳記，用於精準計算各題累計耗時
+  // 追蹤當前題目進入時間戳記與進題前的已累計毫秒數，避免點選選項更新 attempts 時重置計時器
   const questionStartRef = useRef<number | null>(null);
+  const baseElapsedRef = useRef<number>(0);
   const [currentLiveElapsedMs, setCurrentLiveElapsedMs] = useState<number>(0);
 
   // ==================== 3. 結算檢討階段狀態 ====================
@@ -154,39 +155,39 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
     Boolean(currentQuestion) &&
     (mode === "mock" || !currentAttempt?.isSubmitted);
 
-  // 將當前題目尚未寫入的停留毫秒數結算進 attempts
+  // 將當前題目尚未寫入的停留毫秒數結算進 attempts 與 baseElapsedRef
   const flushCurrentQuestionTime = useCallback(() => {
     const now = performance.now();
     const start = questionStartRef.current;
     if (start === null || !currentQuestion) return;
 
     const deltaMs = Math.max(0, Math.round(now - start));
+    const updatedElapsed = baseElapsedRef.current + deltaMs;
+    baseElapsedRef.current = updatedElapsed;
     questionStartRef.current = now;
 
-    if (deltaMs > 0) {
-      setAttempts((prev) => {
-        const existing = prev[currentQuestion.id];
-        if (!existing) return prev;
-        return {
-          ...prev,
-          [currentQuestion.id]: {
-            ...existing,
-            elapsedMs: existing.elapsedMs + deltaMs,
-          },
-        };
-      });
-    }
+    setAttempts((prev) => {
+      const existing = prev[currentQuestion.id];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [currentQuestion.id]: {
+          ...existing,
+          elapsedMs: updatedElapsed,
+        },
+      };
+    });
   }, [currentQuestion]);
 
-  // 當切換題目或計時狀態改變時，重設或停止單題計時起點並每秒更新畫面顯示秒數
+  // 當切換題目或計時狀態改變時，啟動或暫停該題計時器（不依賴 attempts，故點選選項或標記時不會重設）
+  const currentQuestionId = currentQuestion?.id ?? null;
   useEffect(() => {
-    if (!isCurrentQuestionTiming || !currentQuestion) {
+    if (!isCurrentQuestionTiming || currentQuestionId === null) {
       questionStartRef.current = null;
       return;
     }
 
     questionStartRef.current = performance.now();
-    const baseElapsed = attempts[currentQuestion.id]?.elapsedMs ?? 0;
 
     const intervalId = window.setInterval(() => {
       if (questionStartRef.current !== null) {
@@ -194,19 +195,14 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
           0,
           Math.round(performance.now() - questionStartRef.current)
         );
-        setCurrentLiveElapsedMs(baseElapsed + delta);
+        setCurrentLiveElapsedMs(baseElapsedRef.current + delta);
       }
     }, 200);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [
-    currentIndex,
-    currentQuestion,
-    isCurrentQuestionTiming,
-    attempts,
-  ]);
+  }, [currentQuestionId, isCurrentQuestionTiming]);
 
   // 結束測驗並進入結算畫面
   const finalizeQuiz = useCallback(
@@ -303,6 +299,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
       };
     }
 
+    baseElapsedRef.current = 0;
     setActiveQuestions(prepared);
     setAttempts(initialAttempts);
     setCurrentIndex(0);
@@ -323,14 +320,16 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 切換題目（自動結算前一題耗時）
+  // 切換題目（自動結算前一題耗時，並載入目標題目先前已累計的耗時）
   const goToQuestion = useCallback(
     (targetIndex: number) => {
       if (targetIndex < 0 || targetIndex >= activeQuestions.length) return;
       if (targetIndex === currentIndex) return;
       flushCurrentQuestionTime();
       const targetQ = activeQuestions[targetIndex];
-      setCurrentLiveElapsedMs(targetQ ? (attempts[targetQ.id]?.elapsedMs ?? 0) : 0);
+      const targetElapsed = targetQ ? (attempts[targetQ.id]?.elapsedMs ?? 0) : 0;
+      baseElapsedRef.current = targetElapsed;
+      setCurrentLiveElapsedMs(targetElapsed);
       setCurrentIndex(targetIndex);
     },
     [activeQuestions, currentIndex, flushCurrentQuestionTime, attempts]
@@ -376,7 +375,8 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
         : 0;
     questionStartRef.current = null;
 
-    const updatedElapsed = existing.elapsedMs + deltaMs;
+    const updatedElapsed = baseElapsedRef.current + deltaMs;
+    baseElapsedRef.current = updatedElapsed;
     setCurrentLiveElapsedMs(updatedElapsed);
 
     setAttempts((prev) => {
