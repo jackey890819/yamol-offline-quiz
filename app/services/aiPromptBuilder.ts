@@ -239,4 +239,3 @@ export function buildAiExplanationPrompt(
 
   return lines.join("\n");
 }
-
