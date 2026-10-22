@@ -23,7 +23,9 @@ import {
   XCircle,
 } from "lucide-react";
 import type { Route } from "./+types/exam-quiz";
+import { AiPromptModal } from "~/components/AiPromptModal";
 import { ConfirmModal } from "~/components/ConfirmModal";
+import type { AiPromptQuestionContext } from "~/services/aiPromptBuilder";
 import {
   calculateQuizSummary,
   formatCountdown,
@@ -117,6 +119,31 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
   // ==================== 3. 結算檢討階段狀態 ====================
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [reviewSort, setReviewSort] = useState<ReviewSort>("index");
+  const [aiPromptContext, setAiPromptContext] =
+    useState<AiPromptQuestionContext | null>(null);
+
+  const openAiPromptForPreparedQuestion = useCallback(
+    (q: PreparedQuestion) => {
+      const att = attempts[q.id];
+      setAiPromptContext({
+        examTitle: exam.title,
+        categoryTitle: exam.categoryTitle,
+        examYear: exam.year,
+        questionNumber: q.displayIndex,
+        originalQuestionNumber:
+          questionOrder === "random" ? q.questionNumber : undefined,
+        question: q.question,
+        options: q.options,
+        answer: q.answer,
+        difficulty: q.difficulty,
+        correctRate: q.correctRate,
+        stats: q.stats,
+        images: q.images,
+        userSelectedOption: att ? att.selectedOption : undefined,
+      });
+    },
+    [attempts, exam.categoryTitle, exam.title, exam.year, questionOrder]
+  );
 
   // 統計原考卷各難度題數
   const difficultyCounts = useMemo(() => {
@@ -269,15 +296,15 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
           selectedDifficulties: effectiveDifficulties,
         })
       : effectiveMode === "mock"
-        ? (effectiveQuestionOrder === "random"
-            ? prepareQuizQuestions(sourceQuestions, {
-                questionOrder: "random",
-                optionOrder: effectiveOptionOrder,
-                selectedDifficulties: [],
-              })
-            : sourceQuestions.map((q, idx) =>
-                prepareSingleQuestion(q, idx + 1, effectiveOptionOrder)
-              ))
+        ? effectiveQuestionOrder === "random"
+          ? prepareQuizQuestions(sourceQuestions, {
+              questionOrder: "random",
+              optionOrder: effectiveOptionOrder,
+              selectedDifficulties: [],
+            })
+          : sourceQuestions.map((q, idx) =>
+              prepareSingleQuestion(q, idx + 1, effectiveOptionOrder)
+            )
         : prepareQuizQuestions(sourceQuestions, {
             questionOrder: effectiveQuestionOrder,
             optionOrder: effectiveOptionOrder,
@@ -306,11 +333,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
     setCurrentLiveElapsedMs(0);
     setIsAutoSubmittedByTimeout(false);
 
-    if (
-      effectiveMode === "mock" &&
-      enableTimeLimit &&
-      timeLimitMinutes > 0
-    ) {
+    if (effectiveMode === "mock" && enableTimeLimit && timeLimitMinutes > 0) {
       setRemainingSeconds(timeLimitMinutes * 60);
     } else {
       setRemainingSeconds(null);
@@ -327,7 +350,9 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
       if (targetIndex === currentIndex) return;
       flushCurrentQuestionTime();
       const targetQ = activeQuestions[targetIndex];
-      const targetElapsed = targetQ ? (attempts[targetQ.id]?.elapsedMs ?? 0) : 0;
+      const targetElapsed = targetQ
+        ? (attempts[targetQ.id]?.elapsedMs ?? 0)
+        : 0;
       baseElapsedRef.current = targetElapsed;
       setCurrentLiveElapsedMs(targetElapsed);
       setCurrentIndex(targetIndex);
@@ -412,7 +437,13 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
   // 鍵盤快捷鍵支援 (A~E / 1~5 選擇選項，左右方向鍵換題，F 標記，Enter 送出或下一題)
   useEffect(() => {
-    if (phase !== "active" || showSubmitConfirmModal) return;
+    if (
+      phase !== "active" ||
+      showSubmitConfirmModal ||
+      aiPromptContext !== null
+    ) {
+      return;
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
@@ -475,6 +506,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
   }, [
     phase,
     showSubmitConfirmModal,
+    aiPromptContext,
     currentQuestion,
     currentIndex,
     activeQuestions.length,
@@ -671,7 +703,8 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                   )}
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                  仿真實考場體驗，支援倒數計時、不確定題目標記 (Flag) 與日曆式答題卡跳轉，交卷後統一計分、分析各題耗時與檢討錯題。
+                  仿真實考場體驗，支援倒數計時、不確定題目標記 (Flag)
+                  與日曆式答題卡跳轉，交卷後統一計分、分析各題耗時與檢討錯題。
                 </p>
               </button>
             </div>
@@ -758,7 +791,8 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                   步驟 3：單題練習模式專屬選項
                 </h2>
                 <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                  符合篩選題數：{matchingQuestionCount} / {exam.totalQuestions} 題
+                  符合篩選題數：{matchingQuestionCount} / {exam.totalQuestions}{" "}
+                  題
                 </span>
               </div>
 
@@ -1110,7 +1144,8 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                         "border-rose-400 bg-rose-50/80 text-rose-950 font-semibold";
                       badgeStyle = "bg-rose-600 text-white";
                     } else {
-                      cardStyle = "border-slate-200 bg-slate-50/50 text-slate-500";
+                      cardStyle =
+                        "border-slate-200 bg-slate-50/50 text-slate-500";
                     }
                   } else if (isSelected) {
                     cardStyle =
@@ -1167,7 +1202,9 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       {currentAttempt?.isCorrect ? (
                         <>
                           <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                          <span>答對了！正確答案為 ({currentQuestion.answer})</span>
+                          <span>
+                            答對了！正確答案為 ({currentQuestion.answer})
+                          </span>
                         </>
                       ) : (
                         <>
@@ -1179,10 +1216,23 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                         </>
                       )}
                     </div>
-                    <span className="text-xs font-medium">
-                      全站答對率：{Math.round(currentQuestion.correctRate * 100)}
-                      % · 本題思考耗時：{formatDuration(currentLiveElapsedMs)}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-xs font-medium">
+                        全站答對率：
+                        {Math.round(currentQuestion.correctRate * 100)}% ·
+                        本題思考耗時：{formatDuration(currentLiveElapsedMs)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openAiPromptForPreparedQuestion(currentQuestion)
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-xs font-semibold text-indigo-700 shadow-2xs transition hover:border-indigo-300 hover:bg-indigo-50"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        AI 解析
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1221,7 +1271,9 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                           : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                       }`}
                     >
-                      {mode === "mock" && !isAnswered ? "跳過 / 下一題" : "下一題"}
+                      {mode === "mock" && !isAnswered
+                        ? "跳過 / 下一題"
+                        : "下一題"}
                       <ArrowRight className="h-4 w-4" />
                     </button>
                   ) : (
@@ -1246,7 +1298,21 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
             {/* 鍵盤快捷鍵提示 */}
             <p className="text-center text-xs text-slate-400">
-              💡 支援鍵盤操作：按 <kbd className="rounded border bg-white px-1.5 py-0.5">A</kbd>～<kbd className="rounded border bg-white px-1.5 py-0.5">D</kbd> 或 <kbd className="rounded border bg-white px-1.5 py-0.5">1</kbd>～<kbd className="rounded border bg-white px-1.5 py-0.5">4</kbd> 選答案、<kbd className="rounded border bg-white px-1.5 py-0.5">F</kbd> 標記不確定、<kbd className="rounded border bg-white px-1.5 py-0.5">←</kbd> <kbd className="rounded border bg-white px-1.5 py-0.5">→</kbd> 切換題目
+              💡 支援鍵盤操作：按{" "}
+              <kbd className="rounded border bg-white px-1.5 py-0.5">A</kbd>～
+              <kbd className="rounded border bg-white px-1.5 py-0.5">D</kbd> 或{" "}
+              <kbd className="rounded border bg-white px-1.5 py-0.5">1</kbd>～
+              <kbd className="rounded border bg-white px-1.5 py-0.5">4</kbd>{" "}
+              選答案、
+              <kbd className="rounded border bg-white px-1.5 py-0.5">
+                F
+              </kbd>{" "}
+              標記不確定、
+              <kbd className="rounded border bg-white px-1.5 py-0.5">
+                ←
+              </kbd>{" "}
+              <kbd className="rounded border bg-white px-1.5 py-0.5">→</kbd>{" "}
+              切換題目
             </p>
           </div>
 
@@ -1321,9 +1387,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       type="button"
                       onClick={() => goToQuestion(idx)}
                       className={`relative flex h-10 items-center justify-center rounded-xl border text-xs font-semibold transition ${cellStyle} ${
-                        isCurrent
-                          ? "ring-2 ring-indigo-600 ring-offset-2"
-                          : ""
+                        isCurrent ? "ring-2 ring-indigo-600 ring-offset-2" : ""
                       }`}
                       title={`跳轉至第 ${idx + 1} 題${
                         isFlagged ? " (已標記不確定)" : ""
@@ -1360,6 +1424,11 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
           variant="primary"
           onConfirm={() => finalizeQuiz(false)}
           onClose={() => setShowSubmitConfirmModal(false)}
+        />
+
+        <AiPromptModal
+          context={aiPromptContext}
+          onClose={() => setAiPromptContext(null)}
         />
       </div>
     );
@@ -1405,8 +1474,8 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
       <main className="mx-auto max-w-5xl space-y-6 px-6 pt-8">
         {isAutoSubmittedByTimeout && (
           <div className="flex items-center gap-2.5 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3.5 text-sm font-semibold text-amber-900">
-            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
-            ⏰ 測驗規定時間已到，系統已自動為您停止作答並完成交卷結算！
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />⏰
+            測驗規定時間已到，系統已自動為您停止作答並完成交卷結算！
           </div>
         )}
 
@@ -1633,7 +1702,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span
                         className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 font-mono font-medium ${
                           isSlowQuestion
@@ -1648,6 +1717,14 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       <span className="text-slate-500">
                         全站答對率：{Math.round(q.correctRate * 100)}%
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => openAiPromptForPreparedQuestion(q)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/80 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        AI 解析
+                      </button>
                     </div>
                   </div>
 
@@ -1742,6 +1819,11 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
           )}
         </section>
       </main>
+
+      <AiPromptModal
+        context={aiPromptContext}
+        onClose={() => setAiPromptContext(null)}
+      />
     </div>
   );
 }

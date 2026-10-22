@@ -594,7 +594,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   aria-label="篩選科目分類"
                   className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none"
                 >
-                  <option value="ALL">所有科目分類 ({categories.length})</option>
+                  <option value="ALL">
+                    所有科目分類 ({categories.length})
+                  </option>
                   {categories.map((cat) => (
                     <option key={cat} value={cat}>
                       {cat}
@@ -625,7 +627,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 目前本地尚無已下載的考卷
               </h3>
               <p className="mt-1 text-xs text-slate-500">
-                請由上方「考卷匯入」輸入阿摩考卷網址（例如預設的 140603）並點擊「探索考卷」下載。
+                請由上方「考卷匯入」輸入阿摩考卷網址（例如預設的
+                140603）並點擊「探索考卷」下載。
               </p>
             </div>
           ) : groupedExams.length === 0 ? (

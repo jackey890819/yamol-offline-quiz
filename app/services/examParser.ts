@@ -216,8 +216,10 @@ export function transformYamolApiToExamData(
   });
 
   const firstItem = items[0];
-  const year = apiData.exam?.year ?? firstItem?.year ?? new Date().getFullYear();
-  const categoryId = apiData.exam?.catid ?? apiData.classify?.id ?? firstItem?.catid ?? 0;
+  const year =
+    apiData.exam?.year ?? firstItem?.year ?? new Date().getFullYear();
+  const categoryId =
+    apiData.exam?.catid ?? apiData.classify?.id ?? firstItem?.catid ?? 0;
   const categoryTitle = apiData.classify?.title ?? "未分類科目";
   const title = apiData.exam?.title ?? `考卷 #${examId}`;
 

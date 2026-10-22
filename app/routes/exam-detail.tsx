@@ -9,13 +9,17 @@ import {
   FileJson,
   Play,
   Search,
+  Sparkles,
 } from "lucide-react";
 import type { Route } from "./+types/exam-detail";
+import { AiPromptModal } from "~/components/AiPromptModal";
+import type { AiPromptQuestionContext } from "~/services/aiPromptBuilder";
 import { getLocalExam } from "~/services/yamolCrawler.server";
 import styles from "~/styles/exam-viewer.module.css";
 import {
   ALL_DIFFICULTY_LEVELS,
   type DifficultyLevel,
+  type ExamQuestion,
   type OptionKey,
 } from "~/types/exam";
 
@@ -63,6 +67,24 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
   const [pinnedQuestionIds, setPinnedQuestionIds] = useState<Set<number>>(
     new Set()
   );
+  const [aiPromptContext, setAiPromptContext] =
+    useState<AiPromptQuestionContext | null>(null);
+
+  const openAiPromptForQuestion = (q: ExamQuestion) => {
+    setAiPromptContext({
+      examTitle: exam.title,
+      categoryTitle: exam.categoryTitle,
+      examYear: exam.year,
+      questionNumber: q.questionNumber,
+      question: q.question,
+      options: q.options,
+      answer: q.answer,
+      difficulty: q.difficulty,
+      correctRate: q.correctRate,
+      stats: q.stats,
+      images: q.images,
+    });
+  };
 
   const difficultyCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: exam.questions.length };
@@ -271,9 +293,19 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                     </span>
                   </div>
 
-                  <span className="text-xs font-medium text-slate-500">
-                    全站答對率：{Math.round(q.correctRate * 100)}%
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-medium text-slate-500">
+                      全站答對率：{Math.round(q.correctRate * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openAiPromptForQuestion(q)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/80 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      AI 解析
+                    </button>
+                  </div>
                 </div>
 
                 {/* 題幹與附圖 */}
@@ -325,7 +357,9 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                         >
                           {optKey}
                         </span>
-                        <span className="flex-1 leading-relaxed">{optText}</span>
+                        <span className="flex-1 leading-relaxed">
+                          {optText}
+                        </span>
                       </div>
                     );
                   })}
@@ -404,6 +438,11 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
           })
         )}
       </main>
+
+      <AiPromptModal
+        context={aiPromptContext}
+        onClose={() => setAiPromptContext(null)}
+      />
     </div>
   );
 }

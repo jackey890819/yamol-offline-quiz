@@ -1,11 +1,7 @@
 export type OptionKey = "A" | "B" | "C" | "D" | "E";
 
 export type DifficultyLevel =
-  | "非常簡單"
-  | "簡單"
-  | "適中"
-  | "困難"
-  | "非常困難";
+  "非常簡單" | "簡單" | "適中" | "困難" | "非常困難";
 
 export const ALL_DIFFICULTY_LEVELS: DifficultyLevel[] = [
   "非常簡單",

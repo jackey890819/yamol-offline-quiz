@@ -75,7 +75,9 @@ export async function exploreExamByInput(
 
   const data = (await res.json()) as YamolExamListResponse;
   if (!data.items || data.items.length === 0) {
-    throw new Error(`找不到考卷 #${examId} 的題目資料，請確認該考卷編號是否正確`);
+    throw new Error(
+      `找不到考卷 #${examId} 的題目資料，請確認該考卷編號是否正確`
+    );
   }
 
   const categoryId =
@@ -183,7 +185,9 @@ async function downloadExamImages(
 /**
  * 下載單份考卷（含圖片離線化）並儲存至 `data/exams/{examId}.json`
  */
-export async function downloadAndSaveExam(examIdInput: string): Promise<ExamData> {
+export async function downloadAndSaveExam(
+  examIdInput: string
+): Promise<ExamData> {
   const examId = extractExamIdFromInput(examIdInput);
   if (!examId) {
     throw new Error(`無效的考卷編號: ${examIdInput}`);
