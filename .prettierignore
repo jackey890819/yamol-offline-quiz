@@ -1,0 +1,12 @@
+# Package manager lockfiles
+pnpm-lock.yaml
+
+# Build & generated files
+build/
+dist/
+.react-router/
+
+# Local data & scraped assets
+data/
+public/exam-images/
+

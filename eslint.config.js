@@ -10,6 +10,7 @@ export default tseslint.config(
       "node_modules/**",
       ".react-router/**",
       "test-scrape.js",
+      "pnpm-lock.yaml",
     ],
   },
   js.configs.recommended,
