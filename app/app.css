@@ -1,8 +1,49 @@
 @import "tailwindcss";
 
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    :root:not(:has(> head > meta[name="color-scheme"][content="light"])) & {
+      @slot;
+    }
+  }
+  :root:has(> head > meta[name="color-scheme"][content="dark"]) & {
+    @slot;
+  }
+}
+
 @layer base {
+  :root {
+    --brand-accent-light: #4f46e5;
+    --brand-accent-dark: #818cf8;
+    --accent-color: var(--brand-accent-light);
+
+    @media (prefers-color-scheme: dark) {
+      --accent-color: var(--brand-accent-dark);
+    }
+
+    @supports (color: light-dark(white, black)) {
+      --accent-color: light-dark(
+        var(--brand-accent-light),
+        var(--brand-accent-dark)
+      );
+    }
+
+    color-scheme: light dark;
+    accent-color: var(--accent-color);
+
+    &:has(> head > meta[name="color-scheme"][content="dark"]) {
+      color-scheme: dark;
+      --accent-color: var(--brand-accent-dark);
+    }
+
+    &:has(> head > meta[name="color-scheme"][content="light"]) {
+      color-scheme: light;
+      --accent-color: var(--brand-accent-light);
+    }
+  }
+
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-slate-50 text-slate-900 antialiased transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100;
     font-family:
       "Inter",
       "Noto Sans TC",

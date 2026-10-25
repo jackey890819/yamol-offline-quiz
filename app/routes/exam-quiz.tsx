@@ -25,6 +25,7 @@ import {
 import type { Route } from "./+types/exam-quiz";
 import { AiPromptModal } from "~/components/AiPromptModal";
 import { ConfirmModal } from "~/components/ConfirmModal";
+import { ThemeToggle } from "~/components/ThemeToggle";
 import type { AiPromptQuestionContext } from "~/services/aiPromptBuilder";
 import {
   calculateQuizSummary,
@@ -71,11 +72,13 @@ export async function loader({ params }: Route.LoaderArgs) {
 const OPTION_KEYS: OptionKey[] = ["A", "B", "C", "D", "E"];
 
 const DIFFICULTY_BADGE_STYLE: Record<DifficultyLevel, string> = {
-  非常簡單: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  簡單: "bg-teal-100 text-teal-800 border-teal-200",
-  適中: "bg-sky-100 text-sky-800 border-sky-200",
-  困難: "bg-amber-100 text-amber-800 border-amber-200",
-  非常困難: "bg-rose-100 text-rose-800 border-rose-200",
+  非常簡單:
+    "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60",
+  簡單: "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-950/60 dark:text-teal-300 dark:border-teal-800/60",
+  適中: "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/60",
+  困難: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60",
+  非常困難:
+    "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/60",
 };
 
 type QuizPhase = "setup" | "active" | "summary";
@@ -611,48 +614,51 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
   // ==================== 畫面渲染：1. 設定階段 ====================
   if (phase === "setup") {
     return (
-      <div className="min-h-screen bg-slate-50 pb-16">
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+      <div className="min-h-screen bg-slate-50 pb-16 dark:bg-slate-950">
+        <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-6 py-4">
             <Link
               to={`/exams/${exam.examId}`}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-indigo-600"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
             >
               <ArrowLeft className="h-4 w-4" />
               返回考卷閱覽
             </Link>
-            <Link
-              to="/"
-              className="text-xs font-medium text-slate-500 hover:text-slate-800"
-            >
-              題庫管理中心
-            </Link>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                to="/"
+                className="text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                題庫管理中心
+              </Link>
+              <ThemeToggle />
+            </div>
           </div>
         </header>
 
         <main className="mx-auto max-w-4xl space-y-6 px-6 pt-8">
           {/* 考卷標題卡片 */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">
+              <span className="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300">
                 {exam.categoryTitle}
               </span>
-              <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+              <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 #{exam.examId}
               </span>
-              <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+              <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 總題數 {exam.totalQuestions} 題
               </span>
             </div>
-            <h1 className="mt-2 text-xl font-bold text-slate-900">
+            <h1 className="mt-2 text-xl font-bold text-slate-900 dark:text-slate-100">
               {exam.title}
             </h1>
           </div>
 
           {/* 模式選擇 */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
-            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <SlidersHorizontal className="h-5 w-5 text-indigo-600" />
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
+              <SlidersHorizontal className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               步驟 1：選擇刷題模式
             </h2>
 
@@ -662,13 +668,13 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                 onClick={() => setMode("practice")}
                 className={`flex flex-col items-start rounded-2xl border-2 p-5 text-left transition ${
                   mode === "practice"
-                    ? "border-indigo-600 bg-indigo-50/40 shadow-xs"
-                    : "border-slate-200 bg-white hover:border-slate-300"
+                    ? "border-indigo-600 bg-indigo-50/40 shadow-xs dark:border-indigo-500 dark:bg-indigo-950/30"
+                    : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-slate-600"
                 }`}
               >
                 <div className="flex w-full items-center justify-between">
-                  <span className="inline-flex items-center gap-2 text-base font-bold text-slate-900">
-                    <Sparkles className="h-5 w-5 text-indigo-600" />
+                  <span className="inline-flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
+                    <Sparkles className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                     單題練習模式
                   </span>
                   {mode === "practice" && (
@@ -677,7 +683,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
                   每次顯示一題，選好並送出答案後立即批改對錯、顯示標準答案與全站選答率統計。支援指定特定難度的題目練習。
                 </p>
               </button>
@@ -687,13 +693,13 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                 onClick={() => setMode("mock")}
                 className={`flex flex-col items-start rounded-2xl border-2 p-5 text-left transition ${
                   mode === "mock"
-                    ? "border-indigo-600 bg-indigo-50/40 shadow-xs"
-                    : "border-slate-200 bg-white hover:border-slate-300"
+                    ? "border-indigo-600 bg-indigo-50/40 shadow-xs dark:border-indigo-500 dark:bg-indigo-950/30"
+                    : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-slate-600"
                 }`}
               >
                 <div className="flex w-full items-center justify-between">
-                  <span className="inline-flex items-center gap-2 text-base font-bold text-slate-900">
-                    <Timer className="h-5 w-5 text-indigo-600" />
+                  <span className="inline-flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
+                    <Timer className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                     模擬考模式
                   </span>
                   {mode === "mock" && (
@@ -702,7 +708,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
                   仿真實考場體驗，支援倒數計時、不確定題目標記 (Flag)
                   與日曆式答題卡跳轉，交卷後統一計分、分析各題耗時與檢討錯題。
                 </p>
@@ -711,15 +717,15 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
           </section>
 
           {/* 通用設定：題目順序與選項順序 */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
-            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <Shuffle className="h-5 w-5 text-indigo-600" />
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
+              <Shuffle className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               步驟 2：出題與選項順序設定（通用）
             </h2>
 
             <div className="mt-4 grid gap-6 sm:grid-cols-2">
               <div>
-                <label className="block text-xs font-semibold text-slate-700">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   題目出現順序
                 </label>
                 <div className="mt-2 grid grid-cols-2 gap-2.5">
@@ -729,7 +735,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                     className={`rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ${
                       questionOrder === "sequential"
                         ? "border-indigo-600 bg-indigo-600 text-white"
-                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                     }`}
                   >
                     依原題號順序 (1 → {exam.totalQuestions})
@@ -740,7 +746,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                     className={`rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ${
                       questionOrder === "random"
                         ? "border-indigo-600 bg-indigo-600 text-white"
-                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                     }`}
                   >
                     🔀 隨機打亂題目順序
@@ -749,7 +755,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   選項 (A)(B)(C)(D) 順序
                 </label>
                 <div className="mt-2 grid grid-cols-2 gap-2.5">
@@ -759,7 +765,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                     className={`rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ${
                       optionOrder === "sequential"
                         ? "border-indigo-600 bg-indigo-600 text-white"
-                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                     }`}
                   >
                     依原選項順序
@@ -770,13 +776,13 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                     className={`rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ${
                       optionOrder === "random"
                         ? "border-indigo-600 bg-indigo-600 text-white"
-                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                     }`}
                   >
                     🔀 隨機打亂選項（防背位置）
                   </button>
                 </div>
-                <p className="mt-1.5 text-[11px] text-slate-500">
+                <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                   * 打亂選項時，系統會自動重新對齊正確答案與全站選答率統計。
                 </p>
               </div>
@@ -785,12 +791,12 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
           {/* 模式專屬設定 */}
           {mode === "practice" ? (
-            <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
+            <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-bold text-slate-900">
+                <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                   步驟 3：單題練習模式專屬選項
                 </h2>
-                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300">
                   符合篩選題數：{matchingQuestionCount} / {exam.totalQuestions}{" "}
                   題
                 </span>
@@ -799,7 +805,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
               {/* 考題難度指定（多選） */}
               <div>
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                     指定練習考題難度（可多選）
                   </label>
                   <div className="flex gap-2 text-xs">
@@ -808,17 +814,19 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       onClick={() =>
                         setSelectedDifficulties([...ALL_DIFFICULTY_LEVELS])
                       }
-                      className="font-medium text-indigo-600 hover:underline"
+                      className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
                     >
                       全選難度
                     </button>
-                    <span className="text-slate-300">|</span>
+                    <span className="text-slate-300 dark:text-slate-600">
+                      |
+                    </span>
                     <button
                       type="button"
                       onClick={() =>
                         setSelectedDifficulties(["困難", "非常困難"])
                       }
-                      className="font-medium text-amber-700 hover:underline"
+                      className="font-medium text-amber-700 hover:underline dark:text-amber-400"
                     >
                       只選困難＋非常困難
                     </button>
@@ -836,18 +844,18 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                         onClick={() => toggleDifficultySelection(lvl)}
                         className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${
                           isSelected
-                            ? "border-indigo-600 bg-indigo-50 text-indigo-800 shadow-2xs"
-                            : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                            ? "border-indigo-600 bg-indigo-50 text-indigo-800 shadow-2xs dark:border-indigo-500 dark:bg-indigo-950/50 dark:text-indigo-200"
+                            : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:bg-slate-800"
                         }`}
                       >
                         <input
                           type="checkbox"
                           readOnly
                           checked={isSelected}
-                          className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600"
+                          className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 dark:border-slate-600"
                         />
                         <span>{lvl}</span>
-                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">
+                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                           {count} 題
                         </span>
                       </button>
@@ -857,18 +865,18 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
               </div>
 
               {/* 作答時是否顯示考題難度 */}
-              <div className="border-t border-slate-100 pt-4">
+              <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
                 <label className="flex cursor-pointer items-center justify-between gap-4">
                   <div>
-                    <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-200">
                       {showDifficultyInPractice ? (
-                        <Eye className="h-4 w-4 text-indigo-600" />
+                        <Eye className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                       ) : (
-                        <EyeOff className="h-4 w-4 text-slate-400" />
+                        <EyeOff className="h-4 w-4 text-slate-400 dark:text-slate-500" />
                       )}
                       作答過程中顯示考題難易度標籤
                     </span>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                       若關閉，作答時將隱藏「簡單／困難」標籤以免影響作答心理，送出答案後才會顯示。
                     </p>
                   </div>
@@ -878,14 +886,14 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                     onChange={(e) =>
                       setShowDifficultyInPractice(e.target.checked)
                     }
-                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
                   />
                 </label>
               </div>
             </section>
           ) : (
-            <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
-              <h2 className="text-base font-bold text-slate-900">
+            <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                 步驟 3：模擬考模式專屬選項
               </h2>
 
@@ -895,13 +903,13 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                     type="checkbox"
                     checked={enableTimeLimit}
                     onChange={(e) => setEnableTimeLimit(e.target.checked)}
-                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
                   />
                   <div>
-                    <span className="text-sm font-semibold text-slate-800">
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                       啟用模擬考倒數計時限制
                     </span>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       倒數時間歸零時系統將自動停止作答並交卷結算成績
                     </p>
                   </div>
@@ -917,7 +925,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                         className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
                           timeLimitMinutes === preset
                             ? "border-indigo-600 bg-indigo-600 text-white"
-                            : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                            : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                         }`}
                       >
                         {preset} 分鐘
@@ -935,9 +943,9 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                           )
                         }
                         aria-label="自訂測驗分鐘數"
-                        className="w-20 rounded-xl border border-slate-300 px-3 py-1.5 text-center text-sm font-bold text-slate-900 focus:border-indigo-500 focus:outline-none"
+                        className="w-20 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-center text-sm font-bold text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-indigo-400"
                       />
-                      <span className="text-xs font-medium text-slate-600">
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
                         分鐘
                       </span>
                     </div>
@@ -950,7 +958,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
           {/* 啟動按鈕 */}
           <div className="flex items-center justify-end gap-4">
             {matchingQuestionCount === 0 && (
-              <p className="text-xs font-medium text-rose-600">
+              <p className="text-xs font-medium text-rose-600 dark:text-rose-400">
                 ⚠️ 目前勾選的難度沒有對應題目，請至少勾選一個含有題目的難度。
               </p>
             )}
@@ -983,9 +991,9 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
       remainingSeconds !== null && remainingSeconds <= 300;
 
     return (
-      <div className="min-h-screen bg-slate-50 pb-20">
+      <div className="min-h-screen bg-slate-50 pb-20 dark:bg-slate-950">
         {/* 吸頂作答狀態列 */}
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 shadow-2xs backdrop-blur-xs">
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 shadow-2xs backdrop-blur-xs dark:border-slate-800 dark:bg-slate-900/95">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-3.5">
             <div className="flex items-center gap-3">
               <button
@@ -994,7 +1002,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                   flushCurrentQuestionTime();
                   setPhase("setup");
                 }}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 重設選項
@@ -1004,24 +1012,26 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                   <span className="rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-bold text-white">
                     {mode === "practice" ? "單題練習模式" : "模擬考模式"}
                   </span>
-                  <span className="text-xs font-semibold text-slate-700">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                     進度：{currentIndex + 1} / {activeQuestions.length} 題
                   </span>
                 </div>
-                <p className="mt-0.5 line-clamp-1 max-w-md text-xs text-slate-500">
+                <p className="mt-0.5 line-clamp-1 max-w-md text-xs text-slate-500 dark:text-slate-400">
                   {exam.title}
                 </p>
               </div>
             </div>
 
             {/* 倒數計時器與交卷按鈕 */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <ThemeToggle />
+
               {mode === "mock" && remainingSeconds !== null && (
                 <div
                   className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 font-mono text-sm font-bold ${
                     isLowTimeWarning
-                      ? "animate-pulse border-rose-300 bg-rose-50 text-rose-700"
-                      : "border-slate-200 bg-slate-100 text-slate-800"
+                      ? "animate-pulse border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+                      : "border-slate-200 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                   }`}
                 >
                   <Timer className="h-4 w-4" />
@@ -1050,15 +1060,15 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
         <main className="mx-auto grid max-w-6xl gap-6 px-6 pt-6 lg:grid-cols-12">
           {/* 左側主作答卡片 (佔 8 欄) */}
           <div className="space-y-5 lg:col-span-8">
-            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
               {/* 題號、難度、單題即時耗時與標記按鈕 */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-7 items-center justify-center rounded-lg bg-slate-900 px-3 text-xs font-bold text-white">
+                  <span className="inline-flex h-7 items-center justify-center rounded-lg bg-slate-900 px-3 text-xs font-bold text-white dark:bg-slate-800 dark:text-slate-100">
                     第 {currentIndex + 1} 題
                   </span>
                   {questionOrder === "random" && (
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                       (原卷第 {currentQuestion.questionNumber} 題)
                     </span>
                   )}
@@ -1073,10 +1083,10 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
                 <div className="flex items-center gap-2.5">
                   <span
-                    className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-medium text-slate-600"
+                    className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                     title="在此題累計花費的思考時間"
                   >
-                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                    <Clock className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                     本題耗時：{formatDuration(currentLiveElapsedMs)}
                   </span>
 
@@ -1085,14 +1095,14 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                     onClick={handleToggleFlag}
                     className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-semibold transition ${
                       currentAttempt?.isFlagged
-                        ? "border-amber-300 bg-amber-100 text-amber-900"
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        ? "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-200"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                     }`}
                   >
                     <Flag
                       className={`h-3.5 w-3.5 ${
                         currentAttempt?.isFlagged
-                          ? "fill-amber-500 text-amber-600"
+                          ? "fill-amber-500 text-amber-600 dark:text-amber-400"
                           : ""
                       }`}
                     />
@@ -1103,7 +1113,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
               {/* 題幹與附圖 */}
               <div className="mt-5 space-y-4">
-                <p className="text-base leading-relaxed font-medium whitespace-pre-line text-slate-900">
+                <p className="text-base leading-relaxed font-medium whitespace-pre-line text-slate-900 dark:text-slate-100">
                   {currentQuestion.question}
                 </p>
 
@@ -1114,7 +1124,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                         key={imgIdx}
                         src={imgSrc}
                         alt={`題目附圖 ${imgIdx + 1}`}
-                        className="max-h-80 rounded-xl border border-slate-200 bg-slate-50 object-contain p-2"
+                        className="max-h-80 rounded-xl border border-slate-200 bg-slate-50 object-contain p-2 dark:border-slate-700 dark:bg-slate-800"
                       />
                     ))}
                   </div>
@@ -1131,25 +1141,26 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                   const isCorrectOpt = currentQuestion.answer === optKey;
 
                   let cardStyle =
-                    "border-slate-200 bg-white text-slate-800 hover:border-indigo-300 hover:bg-indigo-50/30";
-                  let badgeStyle = "bg-slate-100 text-slate-700";
+                    "border-slate-200 bg-white text-slate-800 hover:border-indigo-300 hover:bg-indigo-50/30 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-200 dark:hover:border-indigo-500/60 dark:hover:bg-indigo-950/30";
+                  let badgeStyle =
+                    "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200";
 
                   if (isPracticeSubmitted) {
                     if (isCorrectOpt) {
                       cardStyle =
-                        "border-emerald-400 bg-emerald-50/80 text-emerald-950 font-semibold";
+                        "border-emerald-400 bg-emerald-50/80 text-emerald-950 font-semibold dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-200";
                       badgeStyle = "bg-emerald-600 text-white";
                     } else if (isSelected && !isCorrectOpt) {
                       cardStyle =
-                        "border-rose-400 bg-rose-50/80 text-rose-950 font-semibold";
+                        "border-rose-400 bg-rose-50/80 text-rose-950 font-semibold dark:border-rose-600 dark:bg-rose-950/40 dark:text-rose-200";
                       badgeStyle = "bg-rose-600 text-white";
                     } else {
                       cardStyle =
-                        "border-slate-200 bg-slate-50/50 text-slate-500";
+                        "border-slate-200 bg-slate-50/50 text-slate-500 dark:border-slate-800 dark:bg-slate-800/20 dark:text-slate-500";
                     }
                   } else if (isSelected) {
                     cardStyle =
-                      "border-indigo-600 bg-indigo-50/70 text-indigo-950 font-semibold ring-1 ring-indigo-600";
+                      "border-indigo-600 bg-indigo-50/70 text-indigo-950 font-semibold ring-1 ring-indigo-600 dark:border-indigo-500 dark:bg-indigo-950/50 dark:text-indigo-100 dark:ring-indigo-500";
                     badgeStyle = "bg-indigo-600 text-white";
                   }
 
@@ -1169,13 +1180,13 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       <div className="flex-1 space-y-1">
                         <span className="block leading-relaxed">{optText}</span>
                         {isPracticeSubmitted && (
-                          <div className="flex items-center gap-2 pt-1 text-xs font-normal text-slate-500">
+                          <div className="flex items-center gap-2 pt-1 text-xs font-normal text-slate-500 dark:text-slate-400">
                             <span>
                               全站選答率：{currentQuestion.stats[optKey] ?? 0}%
                             </span>
                             {optionOrder === "random" &&
                               currentQuestion.optionMapping[optKey] && (
-                                <span className="text-slate-400">
+                                <span className="text-slate-400 dark:text-slate-500">
                                   (原卷選項{" "}
                                   {currentQuestion.optionMapping[optKey]})
                                 </span>
@@ -1193,22 +1204,22 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                 <div
                   className={`mt-5 rounded-xl border p-4 ${
                     currentAttempt?.isCorrect
-                      ? "border-emerald-200 bg-emerald-50/70 text-emerald-900"
-                      : "border-rose-200 bg-rose-50/70 text-rose-900"
+                      ? "border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200"
+                      : "border-rose-200 bg-rose-50/70 text-rose-900 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-200"
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 font-bold">
                       {currentAttempt?.isCorrect ? (
                         <>
-                          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                           <span>
                             答對了！正確答案為 ({currentQuestion.answer})
                           </span>
                         </>
                       ) : (
                         <>
-                          <XCircle className="h-5 w-5 text-rose-600" />
+                          <XCircle className="h-5 w-5 text-rose-600 dark:text-rose-400" />
                           <span>
                             答錯了！您選擇 ({currentAttempt?.selectedOption}
                             )，正確答案為 ({currentQuestion.answer})
@@ -1227,7 +1238,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                         onClick={() =>
                           openAiPromptForPreparedQuestion(currentQuestion)
                         }
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-xs font-semibold text-indigo-700 shadow-2xs transition hover:border-indigo-300 hover:bg-indigo-50"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-xs font-semibold text-indigo-700 shadow-2xs transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-800 dark:bg-slate-800 dark:text-indigo-300 dark:hover:bg-slate-700"
                       >
                         <Sparkles className="h-3.5 w-3.5" />
                         AI 解析
@@ -1238,12 +1249,12 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
               )}
 
               {/* 底部換題與送出控制列 */}
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
                 <button
                   type="button"
                   disabled={currentIndex === 0}
                   onClick={() => goToQuestion(currentIndex - 1)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   上一題
@@ -1268,7 +1279,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
                         mode === "mock" || isPracticeSubmitted
                           ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                          : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                       }`}
                     >
                       {mode === "mock" && !isAnswered
@@ -1297,41 +1308,54 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
             </article>
 
             {/* 鍵盤快捷鍵提示 */}
-            <p className="text-center text-xs text-slate-400">
+            <p className="text-center text-xs text-slate-400 dark:text-slate-500">
               💡 支援鍵盤操作：按{" "}
-              <kbd className="rounded border bg-white px-1.5 py-0.5">A</kbd>～
-              <kbd className="rounded border bg-white px-1.5 py-0.5">D</kbd> 或{" "}
-              <kbd className="rounded border bg-white px-1.5 py-0.5">1</kbd>～
-              <kbd className="rounded border bg-white px-1.5 py-0.5">4</kbd>{" "}
+              <kbd className="rounded border bg-white px-1.5 py-0.5 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                A
+              </kbd>
+              ～
+              <kbd className="rounded border bg-white px-1.5 py-0.5 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                D
+              </kbd>{" "}
+              或{" "}
+              <kbd className="rounded border bg-white px-1.5 py-0.5 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                1
+              </kbd>
+              ～
+              <kbd className="rounded border bg-white px-1.5 py-0.5 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                4
+              </kbd>{" "}
               選答案、
-              <kbd className="rounded border bg-white px-1.5 py-0.5">
+              <kbd className="rounded border bg-white px-1.5 py-0.5 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                 F
               </kbd>{" "}
               標記不確定、
-              <kbd className="rounded border bg-white px-1.5 py-0.5">
+              <kbd className="rounded border bg-white px-1.5 py-0.5 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                 ←
               </kbd>{" "}
-              <kbd className="rounded border bg-white px-1.5 py-0.5">→</kbd>{" "}
+              <kbd className="rounded border bg-white px-1.5 py-0.5 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                →
+              </kbd>{" "}
               切換題目
             </p>
           </div>
 
           {/* 右側：日曆網格樣式的答題完成度面板 (佔 4 欄) */}
           <aside className="lg:col-span-4">
-            <div className="sticky top-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <div className="sticky top-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                  <LayoutGrid className="h-4 w-4 text-indigo-600" />
+                <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+                  <LayoutGrid className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                   答題完成度總覽
                 </h2>
-                <span className="text-xs font-bold text-indigo-600">
+                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
                   {progressStats.percent}% ({progressStats.answered}/
                   {progressStats.total})
                 </span>
               </div>
 
               {/* 進度條 */}
-              <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                 <div
                   className="h-full rounded-full bg-indigo-600 transition-all duration-300"
                   style={{ width: `${progressStats.percent}%` }}
@@ -1339,17 +1363,17 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
               </div>
 
               {/* 圖例說明 */}
-              <div className="mt-3.5 flex flex-wrap gap-3 border-b border-slate-100 pb-3 text-[11px] font-medium text-slate-600">
+              <div className="mt-3.5 flex flex-wrap gap-3 border-b border-slate-100 pb-3 text-[11px] font-medium text-slate-600 dark:border-slate-800 dark:text-slate-400">
                 <span className="flex items-center gap-1.5">
                   <span className="h-3 w-3 rounded bg-indigo-600" />
                   已答 ({progressStats.answered})
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 rounded border border-slate-300 bg-slate-50" />
+                  <span className="h-3 w-3 rounded border border-slate-300 bg-slate-50 dark:border-slate-600 dark:bg-slate-800" />
                   未答 ({progressStats.unanswered})
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 rounded border border-amber-400 bg-amber-100" />
+                  <span className="h-3 w-3 rounded border border-amber-400 bg-amber-100 dark:border-amber-600 dark:bg-amber-900/60" />
                   標記不確定 ({progressStats.flagged})
                 </span>
               </div>
@@ -1365,7 +1389,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                   const isFlagged = Boolean(att?.isFlagged);
 
                   let cellStyle =
-                    "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100";
+                    "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800";
 
                   if (mode === "practice" && att?.isSubmitted) {
                     cellStyle = att.isCorrect
@@ -1373,10 +1397,10 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       : "border-rose-500 bg-rose-600 text-white";
                   } else if (isFlagged && hasAns) {
                     cellStyle =
-                      "border-amber-500 bg-amber-100 text-amber-950 font-bold";
+                      "border-amber-500 bg-amber-100 text-amber-950 font-bold dark:border-amber-600 dark:bg-amber-900/70 dark:text-amber-100";
                   } else if (isFlagged) {
                     cellStyle =
-                      "border-amber-400 bg-amber-50 text-amber-800 font-bold";
+                      "border-amber-400 bg-amber-50 text-amber-800 font-bold dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-300";
                   } else if (hasAns) {
                     cellStyle = "border-indigo-600 bg-indigo-600 text-white";
                   }
@@ -1387,7 +1411,9 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       type="button"
                       onClick={() => goToQuestion(idx)}
                       className={`relative flex h-10 items-center justify-center rounded-xl border text-xs font-semibold transition ${cellStyle} ${
-                        isCurrent ? "ring-2 ring-indigo-600 ring-offset-2" : ""
+                        isCurrent
+                          ? "ring-2 ring-indigo-600 ring-offset-2 dark:ring-indigo-400 dark:ring-offset-slate-900"
+                          : ""
                       }`}
                       title={`跳轉至第 ${idx + 1} 題${
                         isFlagged ? " (已標記不確定)" : ""
@@ -1436,18 +1462,20 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
   // ==================== 畫面渲染：3. 交卷結算與錯題檢討階段 ====================
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-slate-50 pb-20 dark:bg-slate-950">
+      <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-4">
           <Link
             to={`/exams/${exam.examId}`}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
           >
             <ArrowLeft className="h-4 w-4" />
             返回考卷閱覽
           </Link>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <ThemeToggle />
+
             {summaryResult.wrongCount + summaryResult.unansweredCount > 0 && (
               <button
                 type="button"
@@ -1473,21 +1501,23 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
       <main className="mx-auto max-w-5xl space-y-6 px-6 pt-8">
         {isAutoSubmittedByTimeout && (
-          <div className="flex items-center gap-2.5 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3.5 text-sm font-semibold text-amber-900">
-            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />⏰
-            測驗規定時間已到，系統已自動為您停止作答並完成交卷結算！
+          <div className="flex items-center gap-2.5 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3.5 text-sm font-semibold text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/50 dark:text-amber-200">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            ⏰ 測驗規定時間已到，系統已自動為您停止作答並完成交卷結算！
           </div>
         )}
 
         {/* 成績與耗時總覽卡片 */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs">
-          <div className="flex flex-col justify-between gap-6 border-b border-slate-100 pb-6 md:flex-row md:items-center">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-col justify-between gap-6 border-b border-slate-100 pb-6 md:flex-row md:items-center dark:border-slate-800">
             <div className="space-y-1">
-              <span className="rounded-md bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+              <span className="rounded-md bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300">
                 {mode === "mock" ? "模擬考結算報告" : "單題練習結算報告"}
               </span>
-              <h1 className="text-xl font-bold text-slate-900">{exam.title}</h1>
-              <p className="text-xs text-slate-500">
+              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                {exam.title}
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 題目順序：{questionOrder === "random" ? "隨機打亂" : "依原題號"}{" "}
                 · 選項順序：{optionOrder === "random" ? "隨機打亂" : "依原順序"}
               </p>
@@ -1495,14 +1525,14 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <span className="block text-xs font-medium text-slate-500">
+                <span className="block text-xs font-medium text-slate-500 dark:text-slate-400">
                   本次測驗得分
                 </span>
                 <span
                   className={`text-4xl font-extrabold ${
                     summaryResult.score >= 70
-                      ? "text-emerald-600"
-                      : "text-amber-600"
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-amber-600 dark:text-amber-400"
                   }`}
                 >
                   {summaryResult.score}
@@ -1514,11 +1544,11 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
           {/* 數據統計網格 */}
           <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-5">
-            <div className="rounded-xl bg-emerald-50/70 p-4">
-              <span className="text-xs font-medium text-emerald-700">
+            <div className="rounded-xl bg-emerald-50/70 p-4 dark:bg-emerald-950/40">
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
                 答對題數
               </span>
-              <p className="mt-1 text-2xl font-bold text-emerald-800">
+              <p className="mt-1 text-2xl font-bold text-emerald-800 dark:text-emerald-200">
                 {summaryResult.correctCount}{" "}
                 <span className="text-xs font-normal">
                   / {summaryResult.totalQuestions}
@@ -1526,38 +1556,38 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
               </p>
             </div>
 
-            <div className="rounded-xl bg-rose-50/70 p-4">
-              <span className="text-xs font-medium text-rose-700">
+            <div className="rounded-xl bg-rose-50/70 p-4 dark:bg-rose-950/40">
+              <span className="text-xs font-medium text-rose-700 dark:text-rose-300">
                 答錯題數
               </span>
-              <p className="mt-1 text-2xl font-bold text-rose-800">
+              <p className="mt-1 text-2xl font-bold text-rose-800 dark:text-rose-200">
                 {summaryResult.wrongCount}
               </p>
             </div>
 
-            <div className="rounded-xl bg-slate-100/80 p-4">
-              <span className="text-xs font-medium text-slate-600">
+            <div className="rounded-xl bg-slate-100/80 p-4 dark:bg-slate-800/70">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 未作答題數
               </span>
-              <p className="mt-1 text-2xl font-bold text-slate-800">
+              <p className="mt-1 text-2xl font-bold text-slate-800 dark:text-slate-200">
                 {summaryResult.unansweredCount}
               </p>
             </div>
 
-            <div className="rounded-xl bg-indigo-50/70 p-4">
-              <span className="text-xs font-medium text-indigo-700">
+            <div className="rounded-xl bg-indigo-50/70 p-4 dark:bg-indigo-950/40">
+              <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
                 總作答耗時
               </span>
-              <p className="mt-1 text-lg font-bold text-indigo-900">
+              <p className="mt-1 text-lg font-bold text-indigo-900 dark:text-indigo-200">
                 {formatDuration(summaryResult.totalElapsedMs)}
               </p>
             </div>
 
-            <div className="rounded-xl bg-indigo-50/70 p-4">
-              <span className="text-xs font-medium text-indigo-700">
+            <div className="rounded-xl bg-indigo-50/70 p-4 dark:bg-indigo-950/40">
+              <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
                 平均每題耗時
               </span>
-              <p className="mt-1 text-lg font-bold text-indigo-900">
+              <p className="mt-1 text-lg font-bold text-indigo-900 dark:text-indigo-200">
                 {formatDuration(summaryResult.averageElapsedMs)}
               </p>
             </div>
@@ -1565,16 +1595,16 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
           {/* 最耗時題目提醒 */}
           {slowestQuestions.length > 0 && (
-            <div className="mt-5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-              <span className="flex items-center gap-1 font-semibold text-slate-700">
-                <Clock className="h-3.5 w-3.5 text-indigo-600" />
+            <div className="mt-5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+              <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-200">
+                <Clock className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                 最耗時題目排行：
               </span>
               {slowestQuestions.map((q) => (
                 <a
                   key={q.id}
                   href={`#review-q-${q.id}`}
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600"
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
                 >
                   第 {q.displayIndex} 題 (
                   {formatDuration(attempts[q.id]?.elapsedMs ?? 0)})
@@ -1586,15 +1616,15 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
         {/* 錯題檢討與逐題耗時明細 */}
         <section className="space-y-4">
-          <div className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs sm:flex-row sm:items-center">
+          <div className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-900">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setReviewFilter("all")}
                 className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
                   reviewFilter === "all"
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    ? "bg-slate-900 text-white dark:bg-indigo-600 dark:text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                 }`}
               >
                 全部題目 ({activeQuestions.length})
@@ -1605,7 +1635,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                 className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
                   reviewFilter === "wrong_or_unanswered"
                     ? "bg-rose-600 text-white"
-                    : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                    : "bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-900/60"
                 }`}
               >
                 只看錯題與未答 (
@@ -1617,7 +1647,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                 className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
                   reviewFilter === "flagged"
                     ? "bg-amber-600 text-white"
-                    : "bg-amber-50 text-amber-800 hover:bg-amber-100"
+                    : "bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
                 }`}
               >
                 只看標記不確定 ({progressStats.flagged})
@@ -1625,12 +1655,14 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-500">排序：</span>
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                排序：
+              </span>
               <select
                 value={reviewSort}
                 onChange={(e) => setReviewSort(e.target.value as ReviewSort)}
                 aria-label="檢討題目排序方式"
-                className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none"
+                className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:focus:border-indigo-400"
               >
                 <option value="index">依測驗題號順序</option>
                 <option value="time_desc">依各題耗時（由多到少）</option>
@@ -1639,7 +1671,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
           </div>
 
           {reviewedQuestions.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
+            <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
               🎉 沒有符合此篩選條件的題目！
             </div>
           ) : (
@@ -1657,33 +1689,33 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                 <article
                   key={q.id}
                   id={`review-q-${q.id}`}
-                  className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs"
+                  className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900"
                 >
                   {/* 題頭：對錯狀態、題號、難度、本題耗時 */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
                     <div className="flex flex-wrap items-center gap-2">
                       {isCorrect ? (
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           答對
                         </span>
                       ) : userSelected === null ? (
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700">
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                           <HelpCircle className="h-3.5 w-3.5" />
                           未作答
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-800">
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
                           <XCircle className="h-3.5 w-3.5" />
                           答錯
                         </span>
                       )}
 
-                      <span className="text-sm font-bold text-slate-900">
+                      <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
                         第 {q.displayIndex} 題
                       </span>
                       {questionOrder === "random" && (
-                        <span className="text-xs text-slate-400">
+                        <span className="text-xs text-slate-400 dark:text-slate-500">
                           (原卷第 {q.questionNumber} 題)
                         </span>
                       )}
@@ -1695,7 +1727,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       </span>
 
                       {att?.isFlagged && (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
                           <Flag className="h-3 w-3 fill-amber-500" />
                           已標記
                         </span>
@@ -1706,21 +1738,21 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       <span
                         className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 font-mono font-medium ${
                           isSlowQuestion
-                            ? "bg-amber-100 text-amber-900"
-                            : "bg-slate-100 text-slate-600"
+                            ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300"
+                            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                         }`}
                       >
                         <Clock className="h-3.5 w-3.5" />
                         耗時：{formatDuration(elapsedMs)}
                         {isSlowQuestion && " (耗時較長)"}
                       </span>
-                      <span className="text-slate-500">
+                      <span className="text-slate-500 dark:text-slate-400">
                         全站答對率：{Math.round(q.correctRate * 100)}%
                       </span>
                       <button
                         type="button"
                         onClick={() => openAiPromptForPreparedQuestion(q)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/80 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/80 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100 dark:border-indigo-800/70 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:border-indigo-700 dark:hover:bg-indigo-900/60"
                       >
                         <Sparkles className="h-3.5 w-3.5" />
                         AI 解析
@@ -1730,7 +1762,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
                   {/* 題幹與附圖 */}
                   <div className="mt-4 space-y-3">
-                    <p className="text-base leading-relaxed font-medium whitespace-pre-line text-slate-900">
+                    <p className="text-base leading-relaxed font-medium whitespace-pre-line text-slate-900 dark:text-slate-100">
                       {q.question}
                     </p>
                     {q.images.length > 0 && (
@@ -1741,7 +1773,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                             src={imgSrc}
                             alt={`第 ${q.displayIndex} 題附圖`}
                             loading="lazy"
-                            className="max-h-80 rounded-xl border border-slate-200 bg-slate-50 object-contain p-2"
+                            className="max-h-80 rounded-xl border border-slate-200 bg-slate-50 object-contain p-2 dark:border-slate-700 dark:bg-slate-800"
                           />
                         ))}
                       </div>
@@ -1759,13 +1791,13 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       const pct = q.stats[optKey] ?? 0;
 
                       let rowClass =
-                        "border-slate-200 bg-slate-50/40 text-slate-700";
+                        "border-slate-200 bg-slate-50/40 text-slate-700 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300";
                       if (isAns) {
                         rowClass =
-                          "border-emerald-300 bg-emerald-50/80 text-emerald-950 font-semibold";
+                          "border-emerald-300 bg-emerald-50/80 text-emerald-950 font-semibold dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200";
                       } else if (isUserPick && !isAns) {
                         rowClass =
-                          "border-rose-300 bg-rose-50/80 text-rose-950 font-semibold";
+                          "border-rose-300 bg-rose-50/80 text-rose-950 font-semibold dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200";
                       }
 
                       return (
@@ -1780,7 +1812,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                                   ? "bg-emerald-600 text-white"
                                   : isUserPick
                                     ? "bg-rose-600 text-white"
-                                    : "bg-slate-200 text-slate-700"
+                                    : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
                               }`}
                             >
                               {optKey}
@@ -1800,12 +1832,12 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                               </span>
                             )}
                             {isUserPick && isAns && (
-                              <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                              <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
                                 您的選擇
                               </span>
                             )}
-                            <span className="flex items-center gap-1 rounded-md bg-white/90 px-2 py-0.5 font-mono text-xs text-slate-600">
-                              <BarChart3 className="h-3 w-3 text-slate-400" />
+                            <span className="flex items-center gap-1 rounded-md bg-white/90 px-2 py-0.5 font-mono text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                              <BarChart3 className="h-3 w-3 text-slate-400 dark:text-slate-500" />
                               {pct}%
                             </span>
                           </div>

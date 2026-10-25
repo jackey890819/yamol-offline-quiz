@@ -175,35 +175,35 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
       ref={dialogRef}
       closedby="any"
       aria-labelledby={titleId}
-      className={`${styles.modalDialog} m-auto w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl`}
+      className={`${styles.modalDialog} m-auto w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100`}
     >
       {context && (
         <div className="flex max-h-[90vh] flex-col">
           {/* 頂部標題列 */}
-          <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+          <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4 dark:border-slate-800">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-950/70 dark:text-indigo-400">
                 <Sparkles className="h-5 w-5" />
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2
                     id={titleId}
-                    className="text-base font-bold text-slate-900"
+                    className="text-base font-bold text-slate-900 dark:text-slate-100"
                   >
                     AI 解析提示詞 — 第 {context.questionNumber} 題
                   </h2>
-                  <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
+                  <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                     正解 ({context.answer})
                   </span>
                   {hasUserAttemptInfo &&
                     context.userSelectedOption !== context.answer && (
-                      <span className="rounded-md bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">
+                      <span className="rounded-md bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
                         您的選擇 ({context.userSelectedOption})
                       </span>
                     )}
                 </div>
-                <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">
+                <p className="mt-0.5 line-clamp-1 text-xs text-slate-500 dark:text-slate-400">
                   {context.categoryTitle} · 全站答對率{" "}
                   {Math.round(context.correctRate * 100)}%
                 </p>
@@ -213,7 +213,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
             <button
               type="button"
               onClick={() => dialogRef.current?.close()}
-              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
               aria-label="關閉視窗"
             >
               <X className="h-5 w-5" />
@@ -224,7 +224,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
           <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
             {/* 解析風格選擇 */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                 1. 選擇希望 AI 回答的解析深度與風格
               </label>
               <div className="mt-2 grid gap-2.5 sm:grid-cols-3">
@@ -241,19 +241,21 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
                       }}
                       className={`flex flex-col items-start rounded-xl border p-3 text-left transition ${
                         isSelected
-                          ? "border-indigo-600 bg-indigo-50/60 ring-1 ring-indigo-600"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                          ? "border-indigo-600 bg-indigo-50/60 ring-1 ring-indigo-600 dark:border-indigo-500 dark:bg-indigo-950/40 dark:ring-indigo-500"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:border-slate-600 dark:hover:bg-slate-800"
                       }`}
                     >
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                      <span className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-slate-100">
                         <Icon
                           className={`h-3.5 w-3.5 ${
-                            isSelected ? "text-indigo-600" : "text-slate-500"
+                            isSelected
+                              ? "text-indigo-600 dark:text-indigo-400"
+                              : "text-slate-500 dark:text-slate-400"
                           }`}
                         />
                         {opt.label}
                       </span>
-                      <span className="mt-1 text-[11px] leading-snug text-slate-500">
+                      <span className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
                         {opt.desc}
                       </span>
                     </button>
@@ -263,12 +265,12 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
             </div>
 
             {/* 輔助資訊勾選列 */}
-            <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-2.5 text-xs">
-              <span className="font-semibold text-slate-700">
+            <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-2.5 text-xs dark:border-slate-700/80 dark:bg-slate-800/60">
+              <span className="font-semibold text-slate-700 dark:text-slate-300">
                 2. 附加精準化線索：
               </span>
 
-              <label className="inline-flex cursor-pointer items-center gap-1.5 text-slate-700">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 text-slate-700 dark:text-slate-300">
                 <input
                   type="checkbox"
                   checked={includeCrowdStats}
@@ -276,7 +278,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
                     setIncludeCrowdStats(e.target.checked);
                     setCustomEditedPrompt(null);
                   }}
-                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600"
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 dark:border-slate-600"
                 />
                 <span>
                   包含全站選答率與高誘答統計（幫助 AI 點出最多人選錯的陷阱）
@@ -284,7 +286,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
               </label>
 
               {context.userSelectedOption !== undefined && (
-                <label className="inline-flex cursor-pointer items-center gap-1.5 text-slate-700">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 text-slate-700 dark:text-slate-300">
                   <input
                     type="checkbox"
                     checked={includeUserAttempt}
@@ -292,7 +294,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
                       setIncludeUserAttempt(e.target.checked);
                       setCustomEditedPrompt(null);
                     }}
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600"
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 dark:border-slate-600"
                   />
                   <span>
                     包含我的作答紀錄（請 AI 針對我選的選項加強盲點對比）
@@ -303,9 +305,9 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
 
             {/* 若本題含有附圖，顯示附圖預覽與複製圖片提示 */}
             {context.images.length > 0 && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900">
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
                 <div className="flex items-start gap-2">
-                  <ImageIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <ImageIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                   <div className="space-y-2">
                     <p className="font-semibold">
                       本題包含 {context.images.length}{" "}
@@ -318,7 +320,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
                           key={idx}
                           src={imgSrc}
                           alt={`考題附圖 ${idx + 1}`}
-                          className="max-h-32 rounded-lg border border-amber-300 bg-white object-contain p-1.5"
+                          className="max-h-32 rounded-lg border border-amber-300 bg-white object-contain p-1.5 dark:border-amber-700/60 dark:bg-slate-800"
                         />
                       ))}
                     </div>
@@ -332,7 +334,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
               <div className="flex items-center justify-between">
                 <label
                   htmlFor="ai-prompt-textarea"
-                  className="text-xs font-semibold text-slate-700"
+                  className="text-xs font-semibold text-slate-700 dark:text-slate-300"
                 >
                   3. 提示詞內容預覽（可直接在此微調或補充想問的問題）
                 </label>
@@ -340,7 +342,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
                   <button
                     type="button"
                     onClick={() => setCustomEditedPrompt(null)}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
                   >
                     <RotateCcw className="h-3 w-3" />
                     還原預設提示詞
@@ -353,15 +355,15 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
                 rows={11}
                 value={activePromptText}
                 onChange={(e) => setCustomEditedPrompt(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-slate-300 bg-slate-50/50 p-3.5 font-mono text-xs leading-relaxed text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-slate-300 bg-slate-50/50 p-3.5 font-mono text-xs leading-relaxed text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 dark:focus:border-indigo-400 dark:focus:bg-slate-900"
               />
             </div>
           </div>
 
           {/* 底部操作列：一鍵複製 + 快速開啟各 AI 服務 */}
-          <div className="flex flex-col justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4 sm:flex-row sm:items-center">
+          <div className="flex flex-col justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4 sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-800/40">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-medium text-slate-500">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                 複製並前往：
               </span>
               <button
@@ -369,7 +371,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
                 onClick={() =>
                   handleCopyAndOpenAi("https://gemini.google.com/app")
                 }
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
               >
                 Gemini
                 <ExternalLink className="h-3 w-3" />
@@ -377,7 +379,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
               <button
                 type="button"
                 onClick={() => handleCopyAndOpenAi("https://chatgpt.com/")}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
               >
                 ChatGPT
                 <ExternalLink className="h-3 w-3" />
@@ -385,7 +387,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
               <button
                 type="button"
                 onClick={() => handleCopyAndOpenAi("https://claude.ai/new")}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
               >
                 Claude
                 <ExternalLink className="h-3 w-3" />
@@ -396,7 +398,7 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
               <button
                 type="button"
                 onClick={() => dialogRef.current?.close()}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 關閉
               </button>

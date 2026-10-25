@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { Route } from "./+types/home";
 import { ConfirmModal } from "~/components/ConfirmModal";
+import { ThemeToggle } from "~/components/ThemeToggle";
 import {
   deleteLocalExam,
   downloadMultipleExams,
@@ -250,29 +251,30 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   ).length;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-16">
+    <div className="min-h-screen bg-slate-50 pb-16 dark:bg-slate-950">
       {/* 頂部導覽列 */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-xs">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-xs dark:border-slate-800 dark:bg-slate-900/95">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
               <BookOpen className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">
+              <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">
                 阿摩線上測驗 — 離線題庫與刷題系統
               </h1>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 支援考卷探索、同科目批次離線下載、考卷閱覽與模擬測驗
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300">
               <Layers className="h-3.5 w-3.5" />
               本地題庫：{exams.length} 份考卷
             </span>
+            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -281,20 +283,20 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {/* 第一區塊：考卷匯入與同科目探索 */}
         <section
           aria-labelledby="import-heading"
-          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs"
+          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900"
         >
           <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
             <div>
               <h2
                 id="import-heading"
-                className="flex items-center gap-2 text-base font-bold text-slate-900"
+                className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100"
               >
-                <Download className="h-5 w-5 text-indigo-600" />
+                <Download className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                 考卷匯入（探索與離線下載）
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 輸入阿摩考卷網址（如{" "}
-                <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">
+                <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                   https://yamol.tw/exam/140603
                 </code>
                 ）或考卷 ID，系統會先探索考卷資訊並查詢同科目的其他歷屆試卷。
@@ -303,7 +305,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <button
               type="button"
               onClick={() => setQueryInput("https://yamol.tw/exam/140603")}
-              className="inline-flex items-center gap-1 self-start rounded-lg border border-indigo-200 bg-indigo-50/70 px-2.5 py-1 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100 sm:self-auto"
+              className="inline-flex items-center gap-1 self-start rounded-lg border border-indigo-200 bg-indigo-50/70 px-2.5 py-1 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100 sm:self-auto dark:border-indigo-800/70 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
             >
               <Sparkles className="h-3.5 w-3.5" />
               帶入 iPAS 資安初級範例 (#140603)
@@ -320,14 +322,14 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           >
             <input type="hidden" name="intent" value="explore" />
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               <input
                 type="text"
                 name="query"
                 value={queryInput}
                 onChange={(e) => setQueryInput(e.target.value)}
                 placeholder="請輸入考卷網址 (https://yamol.tw/exam/140603) 或考卷編號 (140603)..."
-                className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pr-4 pl-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none"
+                className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pr-4 pl-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400"
                 required
               />
             </div>
@@ -352,13 +354,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
           {/* 錯誤提示 */}
           {exploreFetcher.data && !exploreFetcher.data.ok && (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
               ❌ {exploreFetcher.data.error}
             </div>
           )}
 
           {downloadFetcher.data && !downloadFetcher.data.ok && (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
               ❌ {downloadFetcher.data.error}
             </div>
           )}
@@ -366,9 +368,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           {/* 下載成功提示 */}
           {downloadFetcher.data?.intent === "download" &&
             downloadFetcher.data.ok && (
-              <div className="mt-4 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              <div className="mt-4 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
                 <span className="flex items-center gap-2 font-medium">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   成功下載並離線保存 {downloadFetcher.data.downloadedCount}{" "}
                   份考卷（含題目內附圖）！
                   {downloadFetcher.data.failed.length > 0 &&
@@ -379,31 +381,31 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
           {/* 探索結果卡片 */}
           {exploreResult && (
-            <div className="mt-5 space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-5">
+            <div className="mt-5 space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-5 dark:border-indigo-900/50 dark:bg-indigo-950/25">
               <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">
+                    <span className="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/70 dark:text-indigo-200">
                       {exploreResult.targetExam.categoryTitle}
                     </span>
-                    <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-xs font-medium text-slate-700">
+                    <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                       #{exploreResult.targetExam.examId}
                     </span>
-                    <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-xs font-medium text-slate-700">
+                    <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                       共 {exploreResult.targetExam.totalQuestions} 題
                     </span>
                     {isTargetDownloaded ? (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         已在本地題庫
                       </span>
                     ) : (
-                      <span className="rounded-md bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                      <span className="rounded-md bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
                         尚未下載
                       </span>
                     )}
                   </div>
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                     {exploreResult.targetExam.title}
                   </h3>
                 </div>
@@ -412,9 +414,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   {isTargetDownloaded && (
                     <Link
                       to={`/exams/${exploreResult.targetExam.examId}`}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
-                      <BookOpen className="h-4 w-4 text-indigo-600" />
+                      <BookOpen className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                       直接閱覽考卷
                     </Link>
                   )}
@@ -445,12 +447,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
               {/* 同科目其他試卷探索與多選批次下載 */}
               {relatedExams.length > 0 && (
-                <div className="border-t border-indigo-200/60 pt-4">
+                <div className="border-t border-indigo-200/60 pt-4 dark:border-indigo-800/50">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <button
                       type="button"
                       onClick={() => setShowRelatedList((prev) => !prev)}
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-700 transition hover:text-indigo-900"
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-700 transition hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-indigo-200"
                     >
                       {showRelatedList ? (
                         <ChevronUp className="h-4 w-4" />
@@ -468,7 +470,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                         <button
                           type="button"
                           onClick={handleSelectAllUndownloaded}
-                          className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 transition hover:bg-indigo-50"
+                          className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 transition hover:bg-indigo-50 dark:border-indigo-800 dark:bg-slate-800 dark:text-indigo-300 dark:hover:bg-slate-700"
                         >
                           勾選所有未下載 ({undownloadedRelatedCount})
                         </button>
@@ -492,8 +494,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   </div>
 
                   {showRelatedList && (
-                    <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-600">
+                    <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300">
                         <label className="flex cursor-pointer items-center gap-2.5">
                           <input
                             ref={selectAllCheckboxRef}
@@ -505,7 +507,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                             onChange={(e) =>
                               handleSelectAllRelated(e.target.checked)
                             }
-                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
                           />
                           <span>
                             全選全部 ({selectedRelatedIds.size} /{" "}
@@ -515,7 +517,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                         <span>狀態</span>
                       </div>
 
-                      <div className="max-h-72 divide-y divide-slate-100 overflow-y-auto">
+                      <div className="max-h-72 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
                         {relatedExams.map((rel) => {
                           const isRelDownloaded = downloadedIdSet.has(
                             rel.examId
@@ -524,8 +526,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                           return (
                             <label
                               key={rel.examId}
-                              className={`flex cursor-pointer items-center justify-between gap-4 px-4 py-2.5 text-sm transition hover:bg-slate-50 ${
-                                isChecked ? "bg-indigo-50/40" : ""
+                              className={`flex cursor-pointer items-center justify-between gap-4 px-4 py-2.5 text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800/60 ${
+                                isChecked
+                                  ? "bg-indigo-50/40 dark:bg-indigo-950/30"
+                                  : ""
                               }`}
                             >
                               <div className="flex items-center gap-3">
@@ -533,13 +537,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                                   type="checkbox"
                                   checked={isChecked}
                                   onChange={() => toggleRelatedId(rel.examId)}
-                                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
                                 />
                                 <div>
-                                  <span className="font-medium text-slate-800">
+                                  <span className="font-medium text-slate-800 dark:text-slate-200">
                                     {rel.title}
                                   </span>
-                                  <span className="ml-2 text-xs text-slate-400">
+                                  <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">
                                     #{rel.examId}
                                   </span>
                                 </div>
@@ -547,12 +551,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
                               <div className="shrink-0">
                                 {isRelDownloaded ? (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                                     <CheckCircle2 className="h-3 w-3" />
                                     已下載
                                   </span>
                                 ) : (
-                                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500">
+                                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                                     未下載
                                   </span>
                                 )}
@@ -575,12 +579,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <div>
               <h2
                 id="manage-heading"
-                className="flex items-center gap-2 text-base font-bold text-slate-900"
+                className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100"
               >
-                <FolderOpen className="h-5 w-5 text-indigo-600" />
+                <FolderOpen className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                 本地考卷管理
               </h2>
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                 點選考卷可閱覽完整試題與答案，或直接開啟單題練習／模擬測驗模式
               </p>
             </div>
@@ -592,7 +596,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   aria-label="篩選科目分類"
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:focus:border-indigo-400"
                 >
                   <option value="ALL">
                     所有科目分類 ({categories.length})
@@ -605,13 +609,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 </select>
 
                 <div className="relative">
-                  <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                  <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                   <input
                     type="search"
                     value={searchKeyword}
                     onChange={(e) => setSearchKeyword(e.target.value)}
                     placeholder="搜尋考卷名稱或 ID..."
-                    className="rounded-xl border border-slate-300 bg-white py-2 pr-3 pl-8 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none"
+                    className="rounded-xl border border-slate-300 bg-white py-2 pr-3 pl-8 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400"
                   />
                 </div>
               </div>
@@ -619,20 +623,20 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </div>
 
           {exams.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-900">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
                 <FolderOpen className="h-6 w-6" />
               </div>
-              <h3 className="mt-4 text-sm font-semibold text-slate-800">
+              <h3 className="mt-4 text-sm font-semibold text-slate-800 dark:text-slate-200">
                 目前本地尚無已下載的考卷
               </h3>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 請由上方「考卷匯入」輸入阿摩考卷網址（例如預設的
                 140603）並點擊「探索考卷」下載。
               </p>
             </div>
           ) : groupedExams.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
               找不到符合篩選條件的本地考卷。
             </div>
           ) : (
@@ -640,37 +644,37 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               {groupedExams.map(([categoryTitle, categoryExams]) => (
                 <div
                   key={categoryTitle}
-                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs"
+                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs dark:border-slate-800 dark:bg-slate-900"
                 >
                   {/* 科目分類標頭 */}
-                  <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-5 py-3.5">
+                  <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-800/60">
                     <div className="flex items-center gap-2.5">
-                      <span className="h-2.5 w-2.5 rounded-full bg-indigo-600" />
-                      <h3 className="text-sm font-bold text-slate-900">
+                      <span className="h-2.5 w-2.5 rounded-full bg-indigo-600 dark:bg-indigo-400" />
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                         {categoryTitle}
                       </h3>
                     </div>
-                    <span className="rounded-full bg-slate-200/80 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                    <span className="rounded-full bg-slate-200/80 px-2.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
                       {categoryExams.length} 份考卷
                     </span>
                   </div>
 
                   {/* 該科目下的考卷列表 */}
-                  <div className="divide-y divide-slate-100">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {categoryExams.map((exam) => (
                       <div
                         key={exam.examId}
-                        className="flex flex-col justify-between gap-4 px-5 py-4 transition hover:bg-slate-50/70 lg:flex-row lg:items-center"
+                        className="flex flex-col justify-between gap-4 px-5 py-4 transition hover:bg-slate-50/70 lg:flex-row lg:items-center dark:hover:bg-slate-800/40"
                       >
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                            <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
                               #{exam.examId}
                             </span>
-                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                               {exam.totalQuestions} 題
                             </span>
-                            <span className="text-xs text-slate-400">
+                            <span className="text-xs text-slate-400 dark:text-slate-500">
                               下載於{" "}
                               {new Date(exam.downloadedAt).toLocaleDateString(
                                 "zh-TW"
@@ -680,7 +684,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
                           <Link
                             to={`/exams/${exam.examId}`}
-                            className="block text-sm font-bold text-slate-900 transition hover:text-indigo-600"
+                            className="block text-sm font-bold text-slate-900 transition hover:text-indigo-600 dark:text-slate-100 dark:hover:text-indigo-400"
                           >
                             {exam.title}
                           </Link>
@@ -690,7 +694,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                         <div className="flex shrink-0 flex-wrap items-center gap-2">
                           <Link
                             to={`/exams/${exam.examId}`}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50/50 hover:text-indigo-700"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50/50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/60 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300"
                           >
                             <BookOpen className="h-3.5 w-3.5" />
                             閱覽考卷
@@ -707,7 +711,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                           <a
                             href={`/api/exams/${exam.examId}/export`}
                             download={`exam_${exam.examId}.json`}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100"
                             title="匯出考卷 JSON 檔案"
                           >
                             <FileJson className="h-3.5 w-3.5" />
@@ -718,7 +722,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                             href={exam.sourceUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
                             title="在阿摩開啟原始頁面"
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
@@ -727,7 +731,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                           <button
                             type="button"
                             onClick={() => setExamToDelete(exam)}
-                            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:border-red-800 dark:hover:bg-red-950/50 dark:hover:text-red-400"
                             title="刪除此本地考卷"
                           >
                             <Trash2 className="h-3.5 w-3.5" />

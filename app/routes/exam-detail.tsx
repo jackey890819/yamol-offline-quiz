@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { Route } from "./+types/exam-detail";
 import { AiPromptModal } from "~/components/AiPromptModal";
+import { ThemeToggle } from "~/components/ThemeToggle";
 import type { AiPromptQuestionContext } from "~/services/aiPromptBuilder";
 import { getLocalExam } from "~/services/yamolCrawler.server";
 import styles from "~/styles/exam-viewer.module.css";
@@ -43,11 +44,13 @@ export async function loader({ params }: Route.LoaderArgs) {
 }
 
 const DIFFICULTY_BADGE_STYLE: Record<DifficultyLevel, string> = {
-  非常簡單: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  簡單: "bg-teal-100 text-teal-800 border-teal-200",
-  適中: "bg-sky-100 text-sky-800 border-sky-200",
-  困難: "bg-amber-100 text-amber-800 border-amber-200",
-  非常困難: "bg-rose-100 text-rose-800 border-rose-200",
+  非常簡單:
+    "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60",
+  簡單: "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-950/60 dark:text-teal-300 dark:border-teal-800/60",
+  適中: "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/60",
+  困難: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60",
+  非常困難:
+    "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/60",
 };
 
 const OPTION_KEYS: OptionKey[] = ["A", "B", "C", "D", "E"];
@@ -128,26 +131,28 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
+    <div className="min-h-screen bg-slate-50 pb-20 dark:bg-slate-950">
       {/* 頂部考卷資訊列 */}
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto max-w-5xl px-6 py-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <Link
               to="/"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-indigo-600"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
             >
               <ArrowLeft className="h-4 w-4" />
               返回題庫管理中心
             </Link>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              <ThemeToggle />
+
               <a
                 href={`/api/exams/${exam.examId}/export`}
                 download={`exam_${exam.examId}.json`}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
-                <FileJson className="h-4 w-4 text-slate-500" />
+                <FileJson className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                 匯出考卷 JSON
               </a>
 
@@ -163,38 +168,40 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
 
           <div className="mt-4 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">
+              <span className="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300">
                 {exam.categoryTitle}
               </span>
-              <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+              <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 #{exam.examId}
               </span>
-              <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+              <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 共 {exam.totalQuestions} 題
               </span>
             </div>
-            <h1 className="text-xl font-bold text-slate-900">{exam.title}</h1>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              {exam.title}
+            </h1>
           </div>
         </div>
       </header>
 
       {/* 吸頂工具列：答案顯示切換、難度篩選、搜尋 */}
-      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 shadow-2xs backdrop-blur-xs">
+      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 shadow-2xs backdrop-blur-xs dark:border-slate-800 dark:bg-slate-900/95">
         <div className="mx-auto flex max-w-5xl flex-col gap-3 px-6 py-3.5 md:flex-row md:items-center md:justify-between">
           {/* 答案顯示模式切換開關 */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-              <BookOpen className="h-4 w-4 text-indigo-600" />
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <BookOpen className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
               答案顯示方式：
             </span>
-            <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1">
+            <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-800">
               <button
                 type="button"
                 onClick={() => setAnswerDisplayMode("blur")}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                   answerDisplayMode === "blur"
-                    ? "bg-white text-indigo-700 shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-indigo-700 shadow-2xs dark:bg-slate-900 dark:text-indigo-400"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
                 }`}
               >
                 <EyeOff className="h-3.5 w-3.5" />
@@ -205,8 +212,8 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                 onClick={() => setAnswerDisplayMode("direct")}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                   answerDisplayMode === "direct"
-                    ? "bg-white text-indigo-700 shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-indigo-700 shadow-2xs dark:bg-slate-900 dark:text-indigo-400"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
                 }`}
               >
                 <Eye className="h-3.5 w-3.5" />
@@ -217,20 +224,20 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
 
           {/* 關鍵字搜尋 */}
           <div className="relative w-full md:w-64">
-            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
             <input
               type="search"
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               placeholder="搜尋題幹、選項或題號..."
-              className="w-full rounded-xl border border-slate-300 bg-white py-1.5 pr-3 pl-8 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-300 bg-white py-1.5 pr-3 pl-8 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400"
             />
           </div>
         </div>
 
         {/* 難度快速過濾列 */}
-        <div className="mx-auto flex max-w-5xl items-center gap-1.5 overflow-x-auto border-t border-slate-100 px-6 py-2">
-          <span className="shrink-0 text-xs font-medium text-slate-500">
+        <div className="mx-auto flex max-w-5xl items-center gap-1.5 overflow-x-auto border-t border-slate-100 px-6 py-2 dark:border-slate-800">
+          <span className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">
             難度篩選：
           </span>
           <button
@@ -238,8 +245,8 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
             onClick={() => setSelectedDifficulty("ALL")}
             className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition ${
               selectedDifficulty === "ALL"
-                ? "bg-slate-800 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-slate-800 text-white dark:bg-indigo-600 dark:text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
             }`}
           >
             全部 ({difficultyCounts.ALL})
@@ -252,7 +259,7 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
               className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition ${
                 selectedDifficulty === lvl
                   ? "bg-indigo-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               }`}
             >
               {lvl} ({difficultyCounts[lvl] ?? 0})
@@ -264,7 +271,7 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
       {/* 考題列表 */}
       <main className="mx-auto max-w-5xl space-y-5 px-6 pt-6">
         {filteredQuestions.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
+          <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
             沒有符合目前篩選條件的題目。
           </div>
         ) : (
@@ -278,12 +285,12 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
             return (
               <article
                 key={q.id}
-                className={`${deferredClass ?? ""} rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs transition hover:border-slate-300`}
+                className={`${deferredClass ?? ""} rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700`}
               >
                 {/* 題頭：題號、難度、全站答對率 */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
                   <div className="flex items-center gap-2.5">
-                    <span className="inline-flex h-7 items-center justify-center rounded-lg bg-slate-900 px-2.5 text-xs font-bold text-white">
+                    <span className="inline-flex h-7 items-center justify-center rounded-lg bg-slate-900 px-2.5 text-xs font-bold text-white dark:bg-slate-800 dark:text-slate-100">
                       第 {q.questionNumber} 題
                     </span>
                     <span
@@ -294,13 +301,13 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-slate-500">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                       全站答對率：{Math.round(q.correctRate * 100)}%
                     </span>
                     <button
                       type="button"
                       onClick={() => openAiPromptForQuestion(q)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/80 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/80 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100 dark:border-indigo-800/70 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:border-indigo-700 dark:hover:bg-indigo-900/60"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
                       AI 解析
@@ -310,7 +317,7 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
 
                 {/* 題幹與附圖 */}
                 <div className="mt-4 space-y-3">
-                  <p className="text-base leading-relaxed font-medium whitespace-pre-line text-slate-900">
+                  <p className="text-base leading-relaxed font-medium whitespace-pre-line text-slate-900 dark:text-slate-100">
                     {q.question}
                   </p>
 
@@ -322,7 +329,7 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                           src={imgSrc}
                           alt={`第 ${q.questionNumber} 題附圖 ${imgIdx + 1}`}
                           loading={idx < 2 ? "eager" : "lazy"}
-                          className="max-h-80 rounded-xl border border-slate-200 bg-slate-50 object-contain p-2"
+                          className="max-h-80 rounded-xl border border-slate-200 bg-slate-50 object-contain p-2 dark:border-slate-700 dark:bg-slate-800"
                         />
                       ))}
                     </div>
@@ -344,15 +351,15 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                         key={optKey}
                         className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm transition ${
                           highlightCorrect
-                            ? "border-emerald-300 bg-emerald-50/70 font-semibold text-emerald-950"
-                            : "border-slate-200/80 bg-slate-50/50 text-slate-800"
+                            ? "border-emerald-300 bg-emerald-50/70 font-semibold text-emerald-950 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                            : "border-slate-200/80 bg-slate-50/50 text-slate-800 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-200"
                         }`}
                       >
                         <span
                           className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                             highlightCorrect
                               ? "bg-emerald-600 text-white"
-                              : "bg-slate-200 text-slate-700"
+                              : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
                           }`}
                         >
                           {optKey}
@@ -375,7 +382,7 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                       togglePinQuestion(q.id);
                     }
                   }}
-                  className={`mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 ${
+                  className={`mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/30 ${
                     answerDisplayMode === "blur"
                       ? `${styles.blurAnswerContainer} ${
                           isRevealed ? styles.blurAnswerRevealed : ""
@@ -399,7 +406,7 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <span className="text-xs font-semibold text-slate-600">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                         正確答案：
                       </span>
                       <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-sm font-bold text-white shadow-2xs">
@@ -408,8 +415,8 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                     </div>
 
                     {/* 全站選答率統計 */}
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-                      <span className="flex items-center gap-1 font-medium text-slate-500">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
+                      <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
                         <BarChart3 className="h-3.5 w-3.5" />
                         全站選答率：
                       </span>
@@ -422,8 +429,8 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                             key={k}
                             className={`rounded-md px-2 py-0.5 font-mono text-xs ${
                               isAns
-                                ? "bg-emerald-100 font-bold text-emerald-800"
-                                : "bg-white text-slate-600"
+                                ? "bg-emerald-100 font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"
+                                : "bg-white text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                             }`}
                           >
                             ({k}) {pct}%

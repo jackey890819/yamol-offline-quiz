@@ -29,10 +29,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+          name="color-scheme"
+          content="light dark"
+          suppressHydrationWarning
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var s=localStorage.getItem("color-scheme");if(s==="light"||s==="dark"){document.querySelector('meta[name="color-scheme"]').content=s;}}catch(e){}`,
+          }}
+        />
         <Meta />
         <Links />
       </head>
-      <body className="min-h-screen bg-slate-50 text-slate-900">
+      <body className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
         {children}
         <ScrollRestoration />
         <Scripts />
@@ -63,11 +73,13 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
   return (
     <main className="container mx-auto max-w-3xl p-6 pt-16">
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6">
-        <h1 className="text-xl font-bold text-red-700">{message}</h1>
-        <p className="mt-2 text-sm text-red-600">{details}</p>
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-900/60 dark:bg-red-950/40">
+        <h1 className="text-xl font-bold text-red-700 dark:text-red-400">
+          {message}
+        </h1>
+        <p className="mt-2 text-sm text-red-600 dark:text-red-300">{details}</p>
         {stack && (
-          <pre className="mt-4 w-full overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100">
+          <pre className="mt-4 w-full overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100 dark:border dark:border-slate-800">
             <code>{stack}</code>
           </pre>
         )}
