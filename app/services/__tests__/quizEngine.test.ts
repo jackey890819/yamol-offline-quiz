@@ -66,6 +66,52 @@ describe("quizEngine", () => {
     expect(prepared.stats.D).toBe(10); // 原 A (10%) 被洗到 D
   });
 
+  it("當圖片選項題隨機打亂選項時，optionImages 會與答案及統計同步重新對應", () => {
+    const imageOptionQuestion: ExamQuestion = {
+      questionNumber: 24,
+      id: 3014858,
+      question:
+        "Linux 作業系統中，下列何者用於儲存使用者帳號密碼之雜湊（Hash）檔案？",
+      options: { A: "", B: "", C: "", D: "" },
+      optionImages: {
+        A: ["/exam-images/111501/passwd.jpg"],
+        B: ["/exam-images/111501/shadow.jpg"],
+        C: ["/exam-images/111501/password.jpg"],
+        D: ["/exam-images/111501/secret.jpg"],
+      },
+      answer: "B",
+      difficulty: "簡單",
+      correctRate: 0.66,
+      stats: { A: 138, B: 904, C: 97, D: 101 },
+      images: [],
+      rawHtml: "",
+    };
+
+    // ["A", "B", "C", "D"] 經 Fisher-Yates (j=0) 會變成 ["B", "C", "D", "A"]
+    const prepared = prepareSingleQuestion(
+      imageOptionQuestion,
+      24,
+      "random",
+      () => 0
+    );
+
+    expect(prepared.answer).toBe("A");
+    expect(prepared.optionMapping).toEqual({
+      A: "B",
+      B: "C",
+      C: "D",
+      D: "A",
+    });
+    expect(prepared.optionImages).toEqual({
+      A: ["/exam-images/111501/shadow.jpg"],
+      B: ["/exam-images/111501/password.jpg"],
+      C: ["/exam-images/111501/secret.jpg"],
+      D: ["/exam-images/111501/passwd.jpg"],
+    });
+    expect(prepared.stats.A).toBe(904);
+    expect(prepared.images).toEqual([]);
+  });
+
   it("支援依指定難度多選過濾題目", () => {
     const filtered = prepareQuizQuestions(sampleQuestions, {
       questionOrder: "sequential",

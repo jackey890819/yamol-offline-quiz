@@ -17,6 +17,9 @@ import {
   buildAiExplanationPrompt,
 } from "~/services/aiPromptBuilder";
 import styles from "~/styles/exam-viewer.module.css";
+import type { OptionKey } from "~/types/exam";
+
+const MODAL_OPTION_KEYS: OptionKey[] = ["A", "B", "C", "D", "E"];
 
 interface AiPromptModalProps {
   context: AiPromptQuestionContext | null;
@@ -303,31 +306,60 @@ export function AiPromptModal({ context, onClose }: AiPromptModalProps) {
               )}
             </div>
 
-            {/* 若本題含有附圖，顯示附圖預覽與複製圖片提示 */}
-            {context.images.length > 0 && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
-                <div className="flex items-start gap-2">
-                  <ImageIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                  <div className="space-y-2">
-                    <p className="font-semibold">
-                      本題包含 {context.images.length}{" "}
-                      張考題附圖：建議在下方圖片按「右鍵 →
-                      複製圖片」，與提示詞一併貼給 Gemini / ChatGPT！
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      {context.images.map((imgSrc, idx) => (
-                        <img
-                          key={idx}
-                          src={imgSrc}
-                          alt={`考題附圖 ${idx + 1}`}
-                          className="max-h-32 rounded-lg border border-amber-300 bg-white object-contain p-1.5 dark:border-amber-700/60 dark:bg-slate-800"
-                        />
-                      ))}
+            {/* 若本題含有題幹附圖或選項附圖，顯示附圖預覽與複製圖片提示 */}
+            {(() => {
+              const optionImgEntries: Array<{
+                optKey: OptionKey;
+                src: string;
+              }> = [];
+              for (const k of MODAL_OPTION_KEYS) {
+                for (const src of context.optionImages?.[k] ?? []) {
+                  optionImgEntries.push({ optKey: k, src });
+                }
+              }
+              const totalImgCount =
+                context.images.length + optionImgEntries.length;
+              if (totalImgCount === 0) return null;
+
+              return (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
+                  <div className="flex items-start gap-2">
+                    <ImageIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="space-y-2">
+                      <p className="font-semibold">
+                        本題包含 {totalImgCount} 張附圖：建議在下方圖片按「右鍵
+                        → 複製圖片」，與提示詞一併貼給 Gemini / ChatGPT！
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        {context.images.map((imgSrc, idx) => (
+                          <img
+                            key={`stem-${idx}`}
+                            src={imgSrc}
+                            alt={`考題附圖 ${idx + 1}`}
+                            className="max-h-32 rounded-lg border border-amber-300 bg-white object-contain p-1.5 dark:border-amber-700/60"
+                          />
+                        ))}
+                        {optionImgEntries.map(({ optKey, src }, idx) => (
+                          <div
+                            key={`opt-${optKey}-${idx}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white p-1.5 dark:border-amber-700/60 dark:bg-slate-800"
+                          >
+                            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-600 text-[11px] font-bold text-white">
+                              {optKey}
+                            </span>
+                            <img
+                              src={src}
+                              alt={`選項 (${optKey}) 附圖`}
+                              className="max-h-24 rounded bg-white object-contain p-0.5"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* 提示詞預覽與可編輯文字框 */}
             <div>

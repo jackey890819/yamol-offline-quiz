@@ -107,4 +107,22 @@ describe("aiPromptBuilder", () => {
 
     expect(promptWithImg).toContain("本題包含 1 張考題附圖");
   });
+
+  it("當題目為圖片選項時，會在選項中標示 [圖片選項] 並提示選項附圖數量", () => {
+    const promptWithOptionImgs = buildAiExplanationPrompt({
+      ...baseContext,
+      options: { A: "", B: "", C: "", D: "" },
+      optionImages: {
+        A: ["/exam-images/111501/a.jpg"],
+        B: ["/exam-images/111501/b.jpg"],
+        C: ["/exam-images/111501/c.jpg"],
+        D: ["/exam-images/111501/d.jpg"],
+      },
+      answer: "B",
+    });
+
+    expect(promptWithOptionImgs).toContain("本題包含 4 張選項附圖");
+    expect(promptWithOptionImgs).toContain("- (A) [圖片選項]");
+    expect(promptWithOptionImgs).toContain("官方正確答案**：(B) [圖片選項]");
+  });
 });

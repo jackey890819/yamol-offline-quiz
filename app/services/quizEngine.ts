@@ -28,7 +28,7 @@ export function shuffleArray<T>(
 
 /**
  * 針對單一題目的選項進行順序處理（保持原序或隨機打亂），
- * 並自動重新對應正確答案 (`answer`) 與全站選答率統計 (`stats`)
+ * 並自動重新對應選項附圖 (`optionImages`)、正確答案 (`answer`) 與全站選答率統計 (`stats`)
  */
 export function prepareSingleQuestion(
   question: ExamQuestion,
@@ -37,7 +37,9 @@ export function prepareSingleQuestion(
   randomFn: () => number = Math.random
 ): PreparedQuestion {
   const originalKeys = STANDARD_KEYS.filter(
-    (key) => question.options[key] !== undefined
+    (key) =>
+      question.options[key] !== undefined ||
+      (question.optionImages?.[key]?.length ?? 0) > 0
   );
 
   if (optionOrder === "sequential" || originalKeys.length <= 1) {
@@ -56,6 +58,7 @@ export function prepareSingleQuestion(
   const shuffledOriginalKeys = shuffleArray(originalKeys, randomFn);
 
   const newOptions: Partial<Record<OptionKey, string>> = {};
+  const newOptionImages: Partial<Record<OptionKey, string[]>> = {};
   const newStats: Partial<Record<OptionKey, number>> = {};
   const optionMapping: Partial<Record<OptionKey, OptionKey>> = {};
   let newAnswer: OptionKey = question.answer;
@@ -63,7 +66,11 @@ export function prepareSingleQuestion(
   originalKeys.forEach((displayKey, idx) => {
     const sourceKey = shuffledOriginalKeys[idx]!;
     optionMapping[displayKey] = sourceKey;
-    newOptions[displayKey] = question.options[sourceKey];
+    newOptions[displayKey] = question.options[sourceKey] ?? "";
+    const sourceImages = question.optionImages?.[sourceKey];
+    if (sourceImages && sourceImages.length > 0) {
+      newOptionImages[displayKey] = [...sourceImages];
+    }
     if (question.stats[sourceKey] !== undefined) {
       newStats[displayKey] = question.stats[sourceKey];
     }
@@ -76,6 +83,8 @@ export function prepareSingleQuestion(
     ...question,
     displayIndex,
     options: newOptions,
+    optionImages:
+      Object.keys(newOptionImages).length > 0 ? newOptionImages : undefined,
     answer: newAnswer,
     stats: newStats,
     optionMapping,

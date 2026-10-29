@@ -17,6 +17,8 @@ export interface AiPromptQuestionContext {
   question: string;
   /** 選項內容對應表 (A ~ E) */
   options: Partial<Record<OptionKey, string>>;
+  /** 各選項專屬附圖路徑清單 */
+  optionImages?: Partial<Record<OptionKey, string[]>>;
   /** 正確答案選項代號 */
   answer: OptionKey;
   /** 題目難易度 */
@@ -42,19 +44,33 @@ export interface AiPromptBuildOptions {
 
 const OPTION_KEYS: OptionKey[] = ["A", "B", "C", "D", "E"];
 
+function formatOptionDisplayText(
+  optText: string | undefined,
+  optImgs: readonly string[] | undefined
+): string {
+  const trimmed = (optText ?? "").trim();
+  if (optImgs && optImgs.length > 0) {
+    return trimmed ? `[含選項附圖] ${trimmed}` : "[圖片選項]";
+  }
+  return trimmed;
+}
+
 /**
  * 找出全站選答率最高的「錯誤誘答選項」（選答率需 >= 15% 才視為顯著誘答陷阱）
  */
 export function findTopDistractor(
   options: Partial<Record<OptionKey, string>>,
   answer: OptionKey,
-  stats: Partial<Record<OptionKey, number>>
+  stats: Partial<Record<OptionKey, number>>,
+  optionImages?: Partial<Record<OptionKey, string[]>>
 ): { key: OptionKey; text: string; pct: number } | null {
   let topKey: OptionKey | null = null;
   let topPct = -1;
 
   for (const key of OPTION_KEYS) {
-    if (key === answer || options[key] === undefined) continue;
+    const hasOption =
+      options[key] !== undefined || (optionImages?.[key]?.length ?? 0) > 0;
+    if (key === answer || !hasOption) continue;
     const pct = stats[key] ?? 0;
     if (pct >= 15 && pct > topPct) {
       topKey = key;
@@ -65,7 +81,7 @@ export function findTopDistractor(
   if (!topKey) return null;
   return {
     key: topKey,
-    text: options[topKey] ?? "",
+    text: formatOptionDisplayText(options[topKey], optionImages?.[topKey]),
     pct: topPct,
   };
 }
@@ -84,9 +100,14 @@ export function buildAiExplanationPrompt(
   } = buildOptions;
 
   const availableKeys = OPTION_KEYS.filter(
-    (k) => context.options[k] !== undefined
+    (k) =>
+      context.options[k] !== undefined ||
+      (context.optionImages?.[k]?.length ?? 0) > 0
   );
-  const correctOptionText = context.options[context.answer] ?? "";
+  const correctOptionText = formatOptionDisplayText(
+    context.options[context.answer],
+    context.optionImages?.[context.answer]
+  );
   const correctRatePct = Math.round(context.correctRate * 100);
 
   const hasUserAttempt =
@@ -97,12 +118,26 @@ export function buildAiExplanationPrompt(
     hasUserAttempt && context.userSelectedOption !== context.answer;
   const userSelectedKey = hasUserAttempt ? context.userSelectedOption : null;
   const userSelectedText = userSelectedKey
-    ? (context.options[userSelectedKey] ?? "")
+    ? formatOptionDisplayText(
+        context.options[userSelectedKey],
+        context.optionImages?.[userSelectedKey]
+      )
     : "";
 
   const topDistractor = includeCrowdStats
-    ? findTopDistractor(context.options, context.answer, context.stats)
+    ? findTopDistractor(
+        context.options,
+        context.answer,
+        context.stats,
+        context.optionImages
+      )
     : null;
+
+  const stemImgCount = context.images.length;
+  const optionImgCount = OPTION_KEYS.reduce(
+    (acc, k) => acc + (context.optionImages?.[k]?.length ?? 0),
+    0
+  );
 
   const lines: string[] = [];
 
@@ -127,16 +162,27 @@ export function buildAiExplanationPrompt(
 
   lines.push("### 題幹");
   lines.push(context.question.trim());
-  if (context.images.length > 0) {
+  if (stemImgCount > 0 && optionImgCount > 0) {
     lines.push(
-      `> ⚠️ 備註：本題包含 ${context.images.length} 張考題附圖（若我有附上圖片請一併參考；若無，請先就題幹與選項文字進行原理推導）。`
+      `> ⚠️ 備註：本題包含 ${stemImgCount} 張題幹附圖與 ${optionImgCount} 張選項附圖（若我有附上圖片請一併對應參考；若無，請先就題幹與選項文字進行原理推導）。`
+    );
+  } else if (stemImgCount > 0) {
+    lines.push(
+      `> ⚠️ 備註：本題包含 ${stemImgCount} 張考題附圖（若我有附上圖片請一併參考；若無，請先就題幹與選項文字進行原理推導）。`
+    );
+  } else if (optionImgCount > 0) {
+    lines.push(
+      `> ⚠️ 備註：本題包含 ${optionImgCount} 張選項附圖（若我有附上圖片請依選項代號對應參考；若無，請先就題幹與選項資訊進行原理推導）。`
     );
   }
   lines.push("");
 
   lines.push("### 選項");
   for (const key of availableKeys) {
-    const optText = context.options[key] ?? "";
+    const optText = formatOptionDisplayText(
+      context.options[key],
+      context.optionImages?.[key]
+    );
     const statSuffix =
       includeCrowdStats && context.stats[key] !== undefined
         ? `  *(全站選答率：${context.stats[key]}%)*`

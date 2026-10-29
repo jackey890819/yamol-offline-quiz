@@ -22,6 +22,8 @@ export interface ExamQuestion {
   question: string;
   /** 選項內容對應表 (A ~ D/E) */
   options: Partial<Record<OptionKey, string>>;
+  /** 各選項專屬附圖路徑清單（例如圖片選項或圖文混合選項） */
+  optionImages?: Partial<Record<OptionKey, string[]>>;
   /** 正確答案選項代號 */
   answer: OptionKey;
   /** 題目難易度 */
@@ -30,7 +32,7 @@ export interface ExamQuestion {
   correctRate: number;
   /** 全站各選項選答百分比 (例如 { A: 11, B: 49, C: 23, D: 19 }) */
   stats: Partial<Record<OptionKey, number>>;
-  /** 題目附圖路徑（優先為本地離線路徑 `/exam-images/{examId}/xxx.jpg`） */
+  /** 題幹附圖路徑（優先為本地離線路徑 `/exam-images/{examId}/xxx.jpg`，不含選項附圖） */
   images: string[];
   /** 原始 HTML 字串（備查用） */
   rawHtml: string;

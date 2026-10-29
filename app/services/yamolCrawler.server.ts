@@ -2,7 +2,9 @@ import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
+  collectParsedQuestionImages,
   extractExamIdFromInput,
+  normalizeExamData,
   parseQuestionHtml,
   transformYamolApiToExamData,
   type YamolExamListResponse,
@@ -212,11 +214,11 @@ export async function downloadAndSaveExam(
     throw new Error(`考卷 #${examId} 無題目內容`);
   }
 
-  // 收集所有題目中的圖片網址並下載至本地
+  // 收集所有題目中的圖片網址（包含題幹附圖與各選項附圖）並下載至本地
   const allImageUrls: string[] = [];
   for (const item of apiData.items) {
     const parsed = parseQuestionHtml(item.content || "");
-    allImageUrls.push(...parsed.images);
+    allImageUrls.push(...collectParsedQuestionImages(parsed));
   }
 
   const imageMap = await downloadExamImages(examId, allImageUrls);
@@ -295,7 +297,8 @@ export async function getLocalExam(examId: string): Promise<ExamData | null> {
   if (!existsSync(filePath)) return null;
 
   const content = await fs.readFile(filePath, "utf-8");
-  return JSON.parse(content) as ExamData;
+  const parsed = JSON.parse(content) as ExamData;
+  return normalizeExamData(parsed);
 }
 
 /**

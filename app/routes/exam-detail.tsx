@@ -81,6 +81,7 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
       questionNumber: q.questionNumber,
       question: q.question,
       options: q.options,
+      optionImages: q.optionImages,
       answer: q.answer,
       difficulty: q.difficulty,
       correctRate: q.correctRate,
@@ -340,8 +341,12 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                 <div className="mt-4 space-y-2">
                   {OPTION_KEYS.map((optKey) => {
                     const optText = q.options[optKey];
-                    if (optText === undefined) return null;
+                    const optImgs = q.optionImages?.[optKey] ?? [];
+                    if (optText === undefined && optImgs.length === 0) {
+                      return null;
+                    }
 
+                    const isImageOnly = optImgs.length > 0 && !optText;
                     const isCorrectOption = q.answer === optKey;
                     const highlightCorrect =
                       answerDisplayMode === "direct" && isCorrectOption;
@@ -349,14 +354,18 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                     return (
                       <div
                         key={optKey}
-                        className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm transition ${
+                        className={`flex gap-3 rounded-xl border px-4 py-3 text-sm transition ${
+                          isImageOnly ? "items-center" : "items-start"
+                        } ${
                           highlightCorrect
                             ? "border-emerald-300 bg-emerald-50/70 font-semibold text-emerald-950 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
                             : "border-slate-200/80 bg-slate-50/50 text-slate-800 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-200"
                         }`}
                       >
                         <span
-                          className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                          className={`${
+                            isImageOnly ? "" : "mt-0.5"
+                          }inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                             highlightCorrect
                               ? "bg-emerald-600 text-white"
                               : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
@@ -364,9 +373,26 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                         >
                           {optKey}
                         </span>
-                        <span className="flex-1 leading-relaxed">
-                          {optText}
-                        </span>
+                        <div className="flex-1 space-y-1.5">
+                          {optImgs.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              {optImgs.map((imgSrc, imgIdx) => (
+                                <img
+                                  key={imgIdx}
+                                  src={imgSrc}
+                                  alt={`第 ${q.questionNumber} 題選項 (${optKey}) 附圖 ${imgIdx + 1}`}
+                                  loading={idx < 2 ? "eager" : "lazy"}
+                                  className="max-h-48 max-w-full rounded-lg border border-slate-200 bg-white object-contain p-1.5 dark:border-slate-700"
+                                />
+                              ))}
+                            </div>
+                          )}
+                          {optText && (
+                            <span className="block leading-relaxed">
+                              {optText}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -421,7 +447,12 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
                         全站選答率：
                       </span>
                       {OPTION_KEYS.map((k) => {
-                        if (q.options[k] === undefined) return null;
+                        if (
+                          q.options[k] === undefined &&
+                          !(q.optionImages?.[k]?.length ?? 0)
+                        ) {
+                          return null;
+                        }
                         const pct = q.stats[k] ?? 0;
                         const isAns = q.answer === k;
                         return (

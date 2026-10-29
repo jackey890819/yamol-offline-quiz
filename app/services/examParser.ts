@@ -64,19 +64,64 @@ export function extractExamIdFromInput(input: string): string | null {
   return null;
 }
 
+const IMG_TOKEN_PREFIX = "\uE000__YAMOL_IMG_";
+const IMG_TOKEN_SUFFIX = "__\uE001";
+
+function buildImgToken(index: number): string {
+  return `${IMG_TOKEN_PREFIX}${index}${IMG_TOKEN_SUFFIX}`;
+}
+
+function extractTokensFromSegment(
+  segment: string,
+  extractedUrls: readonly string[],
+  replaceWithSpace: boolean
+): { text: string; images: string[] } {
+  const tokenRegex = /\uE000__YAMOL_IMG_(\d+)__\uE001/g;
+  const images: string[] = [];
+
+  for (const match of segment.matchAll(tokenRegex)) {
+    const idx = Number(match[1]);
+    const url = extractedUrls[idx];
+    if (url) {
+      images.push(url);
+    }
+  }
+
+  const text = segment.replace(tokenRegex, replaceWithSpace ? " " : "");
+  return { text, images };
+}
+
+function extractRawImgUrls(rawHtml: string): {
+  htmlWithTokens: string;
+  extractedUrls: string[];
+} {
+  const extractedUrls: string[] = [];
+  const htmlWithTokens = rawHtml.replace(
+    /<img\b[^>]*?\s+src=(?:"([^"]+)"|'([^']+)')[^>]*>/gi,
+    (_fullMatch, doubleQuoted?: string, singleQuoted?: string) => {
+      const rawUrl = (doubleQuoted ?? singleQuoted ?? "").trim();
+      if (!rawUrl) return "";
+      const decodedUrl = rawUrl.replace(/&amp;/g, "&");
+      const idx = extractedUrls.length;
+      extractedUrls.push(decodedUrl);
+      return buildImgToken(idx);
+    }
+  );
+  return { htmlWithTokens, extractedUrls };
+}
+
 /**
- * 解析阿摩單題的 HTML 字串，提取題幹、選項 (A~E) 與圖片網址清單
+ * 解析阿摩單題的 HTML 字串，提取題幹、選項 (A~E)、題幹附圖與各選項專屬附圖
  */
 export function parseQuestionHtml(rawHtml: string): {
   question: string;
   options: Partial<Record<OptionKey, string>>;
+  optionImages: Partial<Record<OptionKey, string[]>>;
   images: string[];
 } {
-  const images = [...rawHtml.matchAll(/<img[^>]+src="([^"]+)"/gi)]
-    .map((m) => m[1])
-    .filter((url): url is string => Boolean(url));
+  const { htmlWithTokens, extractedUrls } = extractRawImgUrls(rawHtml);
 
-  const cleanText = rawHtml
+  const cleanText = htmlWithTokens
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
     .replace(/<[^>]+>/g, "")
@@ -95,14 +140,25 @@ export function parseQuestionHtml(rawHtml: string): {
   // 為了防止題幹本身出現例如 "(A)" 的罕見情況，我們從最後面找尋依序遞增的 A, B, C, D(, E) 序列
   const matches = findOptionSequenceMatches(allMatches);
 
-  let questionStem = cleanText;
+  let questionStem: string;
+  let stemImages: string[];
   const options: Partial<Record<OptionKey, string>> = {};
+  const optionImages: Partial<Record<OptionKey, string[]>> = {};
 
   const firstMatch = matches[0];
   if (matches.length >= 2 && firstMatch && firstMatch.index !== undefined) {
-    questionStem = cleanText.slice(0, firstMatch.index).trim();
+    const rawStemSlice = cleanText.slice(0, firstMatch.index);
+    const extractedStem = extractTokensFromSegment(
+      rawStemSlice,
+      extractedUrls,
+      false
+    );
+    stemImages = extractedStem.images;
     // 移除開頭題號例如 "1. " 或 "27."
-    questionStem = questionStem.replace(/^\d+\.\s*/, "").trim();
+    questionStem = extractedStem.text
+      .trim()
+      .replace(/^\d+\.\s*/, "")
+      .trim();
 
     for (let i = 0; i < matches.length; i++) {
       const current = matches[i];
@@ -114,20 +170,56 @@ export function parseQuestionHtml(rawHtml: string): {
         nextMatch && nextMatch.index !== undefined
           ? nextMatch.index
           : cleanText.length;
-      options[optKey] = cleanText
-        .slice(startIdx, endIdx)
-        .replace(/\s+/g, " ")
-        .trim();
+
+      const rawOptSlice = cleanText.slice(startIdx, endIdx);
+      const extractedOpt = extractTokensFromSegment(
+        rawOptSlice,
+        extractedUrls,
+        true
+      );
+      options[optKey] = extractedOpt.text.replace(/\s+/g, " ").trim();
+      if (extractedOpt.images.length > 0) {
+        optionImages[optKey] = extractedOpt.images;
+      }
     }
   } else {
-    questionStem = questionStem.replace(/^\d+\.\s*/, "").trim();
+    const extractedStem = extractTokensFromSegment(
+      cleanText,
+      extractedUrls,
+      false
+    );
+    stemImages = extractedStem.images;
+    questionStem = extractedStem.text
+      .trim()
+      .replace(/^\d+\.\s*/, "")
+      .trim();
   }
 
   return {
     question: questionStem,
     options,
-    images,
+    optionImages,
+    images: stemImages,
   };
+}
+
+/**
+ * 彙整單題解析結果中的所有圖片網址（包含題幹附圖與各選項附圖）
+ */
+export function collectParsedQuestionImages(parsed: {
+  images: readonly string[];
+  optionImages?: Partial<Record<OptionKey, string[]>>;
+}): string[] {
+  const urls: string[] = [...parsed.images];
+  if (parsed.optionImages) {
+    for (const key of ["A", "B", "C", "D", "E"] as const) {
+      const optUrls = parsed.optionImages[key];
+      if (optUrls) {
+        urls.push(...optUrls);
+      }
+    }
+  }
+  return urls;
 }
 
 function findOptionSequenceMatches(
@@ -190,6 +282,13 @@ export function transformYamolApiToExamData(
   const questions: ExamQuestion[] = items.map((item, idx) => {
     const parsed = parseQuestionHtml(item.content || "");
     const mappedImages = parsed.images.map((url) => imageMap[url] ?? url);
+    const mappedOptionImages: Partial<Record<OptionKey, string[]>> = {};
+    for (const key of ["A", "B", "C", "D", "E"] as const) {
+      const optUrls = parsed.optionImages[key];
+      if (optUrls && optUrls.length > 0) {
+        mappedOptionImages[key] = optUrls.map((url) => imageMap[url] ?? url);
+      }
+    }
 
     const stats: Partial<Record<OptionKey, number>> = {
       A: item.A ?? 0,
@@ -206,6 +305,9 @@ export function transformYamolApiToExamData(
       id: item.id,
       question: parsed.question,
       options: parsed.options,
+      ...(Object.keys(mappedOptionImages).length > 0
+        ? { optionImages: mappedOptionImages }
+        : {}),
       answer: normalizeAnswer(item.ans),
       difficulty: normalizeDifficulty(item.difficulty),
       correctRate: typeof item.p === "number" ? item.p : 0,
@@ -233,5 +335,92 @@ export function transformYamolApiToExamData(
     downloadedAt: new Date().toISOString(),
     sourceUrl: `https://yamol.tw/exam/${examId}`,
     questions,
+  };
+}
+
+function getSafeFileNameFromUrl(remoteUrl: string): string | null {
+  try {
+    const urlObj = new URL(remoteUrl);
+    const baseName = urlObj.pathname.split("/").pop();
+    if (!baseName) return null;
+    return baseName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  } catch {
+    const fallbackBase = remoteUrl
+      .split("#")[0]
+      ?.split("?")[0]
+      ?.split("/")
+      .pop();
+    if (!fallbackBase) return null;
+    return fallbackBase.replace(/[^a-zA-Z0-9._-]/g, "_");
+  }
+}
+
+/**
+ * 將既有已儲存的考卷資料正規化：
+ * 若早期版本將選項內的 `<img>` 混入題幹 `images` 中，透過 `rawHtml` 自動拆回對應的 `optionImages`，
+ * 並保留原本已下載的本地離線圖片路徑。
+ */
+export function normalizeExamData(exam: ExamData): ExamData {
+  let hasChanged = false;
+
+  const normalizedQuestions = exam.questions.map((q) => {
+    if (q.optionImages !== undefined || !q.rawHtml || q.images.length === 0) {
+      return q;
+    }
+
+    const { extractedUrls } = extractRawImgUrls(q.rawHtml);
+    if (extractedUrls.length === 0) {
+      return q;
+    }
+
+    const reparsed = parseQuestionHtml(q.rawHtml);
+    if (Object.keys(reparsed.optionImages).length === 0) {
+      return q;
+    }
+
+    // 建立遠端網址 -> 本地圖片路徑的映射表
+    const urlToLocalMap = new Map<string, string>();
+    extractedUrls.forEach((remoteUrl, idx) => {
+      const safeName = getSafeFileNameFromUrl(remoteUrl);
+      const matchedByName = safeName
+        ? q.images.find(
+            (img) => img === remoteUrl || img.endsWith(`/${safeName}`)
+          )
+        : undefined;
+      if (matchedByName) {
+        urlToLocalMap.set(remoteUrl, matchedByName);
+      } else if (q.images.length === extractedUrls.length && q.images[idx]) {
+        urlToLocalMap.set(remoteUrl, q.images[idx]);
+      }
+    });
+
+    const resolveImg = (url: string) => urlToLocalMap.get(url) ?? url;
+    const mappedStemImages = reparsed.images.map(resolveImg);
+    const mappedOptionImages: Partial<Record<OptionKey, string[]>> = {};
+
+    for (const key of ["A", "B", "C", "D", "E"] as const) {
+      const optUrls = reparsed.optionImages[key];
+      if (optUrls && optUrls.length > 0) {
+        mappedOptionImages[key] = optUrls.map(resolveImg);
+      }
+    }
+
+    hasChanged = true;
+    return {
+      ...q,
+      question: reparsed.question,
+      options: reparsed.options,
+      optionImages: mappedOptionImages,
+      images: mappedStemImages,
+    };
+  });
+
+  if (!hasChanged) {
+    return exam;
+  }
+
+  return {
+    ...exam,
+    questions: normalizedQuestions,
   };
 }

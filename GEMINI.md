@@ -120,8 +120,8 @@ pnpm start
 ### 5.3 資料與離線資產規範
 
 - **考卷資料儲存**：下載後的考卷統一以 `ExamData` 格式儲存於 `data/exams/{examId}.json`。
-- **圖片離線化**：爬取題目時須解析 `<img src="...">` 並下載至 `public/exam-images/{examId}/`，同時將題目中的 `images` 陣列替換為本地相對路徑 `/exam-images/{examId}/{fileName}`；刪除本地考卷時須一併清理對應的圖片資料夾。
-- **選項洗牌一致性**：在刷題模式啟用「隨機打亂選項」時，必須透過 `prepareSingleQuestion` 同步更新 `options`、`answer`、`stats`（全站各選項選答率）與 `optionMapping`，確保批改與統計數據對應正確。
+- **圖片離線化**：爬取題目時須解析 `<img src="...">` 並下載至 `public/exam-images/{examId}/`，同時依位置將題幹圖片存入 `images`、各選項專屬圖片存入 `optionImages`（替換為本地相對路徑 `/exam-images/{examId}/{fileName}`）；刪除本地考卷時須一併清理對應的圖片資料夾。
+- **選項洗牌一致性**：在刷題模式啟用「隨機打亂選項」時，必須透過 `prepareSingleQuestion` 同步更新 `options`、`optionImages`、`answer`、`stats`（全站各選項選答率）與 `optionMapping`，確保批改、選項附圖與統計數據對應正確。
 
 ### 5.4 UI/UX 與現代網頁實踐
 

@@ -137,6 +137,7 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
           questionOrder === "random" ? q.questionNumber : undefined,
         question: q.question,
         options: q.options,
+        optionImages: q.optionImages,
         answer: q.answer,
         difficulty: q.difficulty,
         correctRate: q.correctRate,
@@ -467,7 +468,11 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
       };
 
       const mappedOpt = keyMap[keyUpper];
-      if (mappedOpt && currentQuestion?.options[mappedOpt] !== undefined) {
+      if (
+        mappedOpt &&
+        (currentQuestion?.options[mappedOpt] !== undefined ||
+          (currentQuestion?.optionImages?.[mappedOpt]?.length ?? 0) > 0)
+      ) {
         e.preventDefault();
         handleSelectOption(mappedOpt);
         return;
@@ -783,7 +788,8 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                   </button>
                 </div>
                 <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                  * 打亂選項時，系統會自動重新對齊正確答案與全站選答率統計。
+                  *
+                  打亂選項時，系統會自動重新對齊選項附圖、正確答案與全站選答率統計。
                 </p>
               </div>
             </div>
@@ -1135,8 +1141,13 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
               <div className="mt-6 space-y-2.5">
                 {OPTION_KEYS.map((optKey) => {
                   const optText = currentQuestion.options[optKey];
-                  if (optText === undefined) return null;
+                  const optImgs = currentQuestion.optionImages?.[optKey] ?? [];
+                  if (optText === undefined && optImgs.length === 0) {
+                    return null;
+                  }
 
+                  const isImageOnlyWithoutMeta =
+                    optImgs.length > 0 && !optText && !isPracticeSubmitted;
                   const isSelected = currentAttempt?.selectedOption === optKey;
                   const isCorrectOpt = currentQuestion.answer === optKey;
 
@@ -1170,15 +1181,35 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                       type="button"
                       disabled={isPracticeSubmitted}
                       onClick={() => handleSelectOption(optKey)}
-                      className={`flex w-full items-start gap-3.5 rounded-xl border p-4 text-left text-sm transition ${cardStyle}`}
+                      className={`flex w-full gap-3.5 rounded-xl border p-4 text-left text-sm transition ${
+                        isImageOnlyWithoutMeta ? "items-center" : "items-start"
+                      } ${cardStyle}`}
                     >
                       <span
-                        className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold transition ${badgeStyle}`}
+                        className={`${
+                          isImageOnlyWithoutMeta ? "" : "mt-0.5"
+                        }inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold transition ${badgeStyle}`}
                       >
                         {optKey}
                       </span>
-                      <div className="flex-1 space-y-1">
-                        <span className="block leading-relaxed">{optText}</span>
+                      <div className="flex-1 space-y-1.5">
+                        {optImgs.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            {optImgs.map((imgSrc, imgIdx) => (
+                              <img
+                                key={imgIdx}
+                                src={imgSrc}
+                                alt={`選項 (${optKey}) 附圖 ${imgIdx + 1}`}
+                                className="max-h-48 max-w-full rounded-lg border border-slate-200 bg-white object-contain p-1.5 dark:border-slate-700"
+                              />
+                            ))}
+                          </div>
+                        )}
+                        {optText && (
+                          <span className="block leading-relaxed">
+                            {optText}
+                          </span>
+                        )}
                         {isPracticeSubmitted && (
                           <div className="flex items-center gap-2 pt-1 text-xs font-normal text-slate-500 dark:text-slate-400">
                             <span>
@@ -1784,8 +1815,12 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                   <div className="mt-4 space-y-2">
                     {OPTION_KEYS.map((optKey) => {
                       const optText = q.options[optKey];
-                      if (optText === undefined) return null;
+                      const optImgs = q.optionImages?.[optKey] ?? [];
+                      if (optText === undefined && optImgs.length === 0) {
+                        return null;
+                      }
 
+                      const isImageOnly = optImgs.length > 0 && !optText;
                       const isAns = q.answer === optKey;
                       const isUserPick = userSelected === optKey;
                       const pct = q.stats[optKey] ?? 0;
@@ -1805,9 +1840,15 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                           key={optKey}
                           className={`flex flex-col justify-between gap-2 rounded-xl border px-4 py-3 text-sm sm:flex-row sm:items-center ${rowClass}`}
                         >
-                          <div className="flex items-start gap-3">
+                          <div
+                            className={`flex gap-3 ${
+                              isImageOnly ? "items-center" : "items-start"
+                            }`}
+                          >
                             <span
-                              className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                              className={`${
+                                isImageOnly ? "" : "mt-0.5"
+                              }inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                                 isAns
                                   ? "bg-emerald-600 text-white"
                                   : isUserPick
@@ -1817,7 +1858,26 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                             >
                               {optKey}
                             </span>
-                            <span className="leading-relaxed">{optText}</span>
+                            <div className="space-y-1.5">
+                              {optImgs.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {optImgs.map((imgSrc, imgIdx) => (
+                                    <img
+                                      key={imgIdx}
+                                      src={imgSrc}
+                                      alt={`第 ${q.displayIndex} 題選項 (${optKey}) 附圖 ${imgIdx + 1}`}
+                                      loading="lazy"
+                                      className="max-h-48 max-w-full rounded-lg border border-slate-200 bg-white object-contain p-1.5 dark:border-slate-700"
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                              {optText && (
+                                <span className="block leading-relaxed">
+                                  {optText}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
