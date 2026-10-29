@@ -23,28 +23,37 @@
 ├── app/
 │   ├── components/
 │   │   ├── AiPromptModal.tsx             # AI 解析提示詞產生器對話框（支援 3 種解析風格切換、統計/盲點附加與一鍵複製）
-│   │   └── ConfirmModal.tsx              # 原生 <dialog> 確認對話框元件（支援 closedby="any" 與降級點擊關閉）
+│   │   ├── ConfirmModal.tsx              # 原生 <dialog> 確認對話框元件（支援 closedby="any" 與降級點擊關閉）
+│   │   └── ThemeToggle.tsx               # 淺色 / 深色 / 系統主題切換元件（支援完整分段與窄欄精簡模式）
 │   ├── routes/
-│   │   ├── home.tsx                      # 首頁：考卷探索、同科目歷屆試卷批次下載、本地題庫分類管理與刪除
+│   │   ├── app-shell.tsx                 # 共用導覽外框：電腦版可收合左側功能選單、行動版滑動抽屜選單與刷題作答專注模式
+│   │   ├── home.tsx                      # 本地題庫管理頁：依科目分類檢視考卷、練習狀態過濾、各卷歷史得分徽章與更多操作選單
+│   │   ├── exam-import.tsx               # 匯入與探索頁：考卷網址/ID 探索、同科目歷屆試卷批次離線下載
+│   │   ├── quiz-history.tsx              # 歷史測驗紀錄總覽頁：全域作答統計指標、依考卷/模式篩選、一鍵重練錯題與紀錄管理
+│   │   ├── quiz-history-detail.tsx       # 單筆歷史紀錄檢討頁：精準還原當時洗牌選項順序、逐題耗時分析與 AI 解析
 │   │   ├── exam-detail.tsx               # 考卷閱覽頁：完整考題瀏覽、模糊遮罩/直接顯示答案切換、難度與關鍵字過濾、AI 解析
-│   │   ├── exam-quiz.tsx                 # 刷題與模擬測驗頁：單題練習模式、計時模擬考模式、鍵盤快捷鍵、作答耗時分析、錯題重練與 AI 解析
+│   │   ├── exam-quiz.tsx                 # 刷題與模擬測驗頁：單題練習、計時模擬考、自動寫入本地歷史紀錄、錯題重練與 AI 解析
 │   │   └── api.exam-export.ts            # Resource Route：將指定本地考卷匯出為標準 JSON 檔案下載
 │   ├── services/
 │   │   ├── __tests__/                    # Vitest 單元測試 (aiPromptBuilder.test.ts, examParser.test.ts, quizEngine.test.ts)
 │   │   ├── aiPromptBuilder.ts            # AI 解析提示詞建構器：整合考科背景、高誘答陷阱選項識別與個人誤選盲點對比
 │   │   ├── examParser.ts                 # 考卷網址/ID 解析、阿摩題目 HTML 清理、選項 (A)~(E) 序列提取與資料格式轉換
-│   │   ├── quizEngine.ts                 # 刷題核心引擎：Fisher-Yates 洗牌、選項重排與答案/統計自動映射、成績與耗時結算
+│   │   ├── quizEngine.ts                 # 刷題核心引擎：Fisher-Yates 洗牌、選項重排與快照還原、成績耗時與歷史統計彙整
+│   │   ├── quizHistory.server.ts         # 伺服器端本地歷史測驗紀錄讀寫與刪除服務 (`data/history/*.json`)
 │   │   └── yamolCrawler.server.ts        # 伺服器端爬蟲與本地檔案讀寫：呼叫阿摩 API、下載附圖至本地、讀寫/刪除考卷 JSON
 │   ├── styles/
+│   │   ├── app-shell.module.css          # 行動版 Scroll-Snap 滑動導覽抽屜與滾動驅動背景遮罩動畫樣式
 │   │   └── exam-viewer.module.css        # 模糊遮罩答案動畫、長列表 content-visibility 延遲渲染、Modal 樣式
 │   ├── types/
-│   │   └── exam.ts                       # 考卷資料 (ExamData)、題目 (ExamQuestion)、刷題設定 (QuizConfig) 與作答紀錄型別定義
+│   │   └── exam.ts                       # 考卷資料、題目、刷題設定、作答紀錄與歷史測驗快照 (QuizHistoryRecord) 型別定義
 │   ├── app.css                           # 全域樣式與 Tailwind CSS v4 進入點
 │   ├── root.tsx                          # 根佈局 (Layout)、HTML 語系設定 (zh-Hant-TW) 與全域 ErrorBoundary
 │   └── routes.ts                         # React Router 路由表設定
 ├── data/
-│   └── exams/
-│       └── {examId}.json                 # 離線儲存的考卷標準格式 JSON 檔案
+│   ├── exams/
+│   │   └── {examId}.json                 # 離線儲存的考卷標準格式 JSON 檔案
+│   └── history/
+│       └── {recordId}.json               # 本地儲存的單次測驗成績與逐題作答快照 JSON 檔案
 ├── public/
 │   └── exam-images/
 │       └── {examId}/                     # 考卷題目內附圖的本地離線圖檔目錄（對應路徑 `/exam-images/{examId}/*`）
@@ -59,14 +68,17 @@
 
 ## 3. 路由結構 (Routes)
 
-路由定義於 `app/routes.ts`：
+路由定義於 `app/routes.ts`（除匯出 API 外皆包覆於共用導覽外框 `app/routes/app-shell.tsx`）：
 
-| 路徑                        | 檔案                            | 說明                                                                                                                                           |
-| :-------------------------- | :------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                         | `app/routes/home.tsx`           | **題庫管理中心**：支援輸入阿摩網址或考卷 ID 探索考卷、列出同科目 (`ClassifyExamAround`) 相關試卷並勾選批次下載、依科目分類檢視與管理本地題庫。 |
-| `/exams/:examId`            | `app/routes/exam-detail.tsx`    | **考卷閱覽頁**：提供「模糊遮罩（滑鼠移過或點擊展開）」與「直接顯示答案」兩種模式，支援依 5 級難度篩選與關鍵字搜尋。                            |
-| `/exams/:examId/quiz`       | `app/routes/exam-quiz.tsx`      | **刷題與模擬測驗頁**：分為 `setup`（設定）、`active`（作答中）、`summary`（成績結算與錯題檢討）三階段，支援單題練習與計時模擬考。              |
-| `/api/exams/:examId/export` | `app/routes/api.exam-export.ts` | **考卷 JSON 匯出 API**：回傳 `exam_{examId}.json` 供使用者下載備份。                                                                           |
+| 路徑                        | 檔案                                 | 說明                                                                                                                                  |
+| :-------------------------- | :----------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
+| `/`                         | `app/routes/home.tsx`                | **本地題庫管理**：依科目分類檢視與管理本地考卷、顯示各卷歷史最高／最近得分徽章，支援練習狀態與關鍵字篩選。                            |
+| `/import`                   | `app/routes/exam-import.tsx`         | **匯入與探索考卷**：支援輸入阿摩網址或考卷 ID 探索考卷、列出同科目 (`ClassifyExamAround`) 相關試卷並勾選批次離線下載。                |
+| `/history`                  | `app/routes/quiz-history.tsx`        | **歷史測驗紀錄總覽**：檢視累計測驗數據指標、依考卷或測驗模式篩選歷次作答紀錄、支援一鍵重練該次錯題與管理紀錄。                        |
+| `/history/:recordId`        | `app/routes/quiz-history-detail.tsx` | **歷史測驗檢討詳情**：精準還原該次測驗的題目與洗牌選項順序、逐題耗時分析、對錯比對與 AI 解析。                                        |
+| `/exams/:examId`            | `app/routes/exam-detail.tsx`         | **考卷閱覽頁**：提供「模糊遮罩（滑鼠移過或點擊展開）」與「直接顯示答案」兩種模式，支援依 5 級難度篩選與關鍵字搜尋。                   |
+| `/exams/:examId/quiz`       | `app/routes/exam-quiz.tsx`           | **刷題與模擬測驗頁**：分為 `setup`、`active`（自動隱藏側欄專注模式）、`summary`（自動寫入本地歷史紀錄）三階段，支援單題練習與模擬考。 |
+| `/api/exams/:examId/export` | `app/routes/api.exam-export.ts`      | **考卷 JSON 匯出 API**：回傳 `exam_{examId}.json` 供使用者下載備份。                                                                  |
 
 ---
 

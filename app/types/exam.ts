@@ -148,3 +148,69 @@ export interface QuizSummaryResult {
   /** 平均每題耗時 (毫秒) */
   averageElapsedMs: number;
 }
+
+export interface QuizHistoryItemSnapshot {
+  /** 阿摩系統單題唯一 ID */
+  questionId: number;
+  /** 原考卷題號 (1-based) */
+  questionNumber: number;
+  /** 該次測驗中的顯示題號 (1-based) */
+  displayIndex: number;
+  /** 顯示選項代號 -> 原始選項代號映射表（用於精準還原隨機洗牌後的選項順序） */
+  optionMapping: Partial<Record<OptionKey, OptionKey>>;
+  /** 該次測驗顯示順序下的正確答案代號 */
+  answer: OptionKey;
+  /** 使用者選擇的選項代號（未作答為 null） */
+  selectedOption: OptionKey | null;
+  /** 是否答對 */
+  isCorrect: boolean;
+  /** 是否標記為不確定 */
+  isFlagged: boolean;
+  /** 該題累計作答耗時 (毫秒) */
+  elapsedMs: number;
+}
+
+export interface QuizHistoryRecord {
+  /** 單筆測驗紀錄唯一 ID */
+  recordId: string;
+  /** 考卷 ID */
+  examId: string;
+  /** 考卷標題快照（即使考卷被刪除仍可顯示歷史標題） */
+  examTitle: string;
+  /** 科目分類名稱快照 */
+  categoryTitle: string;
+  /** 考卷年份快照 */
+  examYear: number;
+  /** 測驗模式 */
+  mode: QuizMode;
+  /** 是否為錯題重練專項練習 */
+  isRetryWrongOnly?: boolean;
+  /** 是否因模擬考倒數歸零而自動交卷 */
+  isAutoSubmittedByTimeout: boolean;
+  /** 題目順序策略 */
+  questionOrder: OrderStrategy;
+  /** 選項順序策略 */
+  optionOrder: OrderStrategy;
+  /** 模擬考時間限制（分鐘），無限制或單題練習為 null */
+  timeLimitMinutes: number | null;
+  /** 交卷完成 ISO 時間字串 */
+  completedAt: string;
+  /** 成績與耗時統計摘要 */
+  summary: QuizSummaryResult;
+  /** 該次答錯或未作答的原題 ID 清單（供一鍵重練錯題使用） */
+  wrongQuestionIds: number[];
+  /** 逐題作答快照清單 */
+  items: QuizHistoryItemSnapshot[];
+}
+
+export type QuizHistorySummary = Omit<QuizHistoryRecord, "items">;
+
+export interface ExamHistoryStats {
+  examId: string;
+  attemptCount: number;
+  bestScore: number;
+  latestScore: number;
+  latestCompletedAt: string;
+  latestRecordId: string;
+  latestWrongCount: number;
+}

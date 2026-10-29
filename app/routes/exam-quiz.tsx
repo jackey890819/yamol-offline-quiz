@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
+import {
+  Link,
+  useFetcher,
+  useOutletContext,
+  useSearchParams,
+} from "react-router";
 import {
   AlertCircle,
   ArrowLeft,
@@ -11,7 +16,9 @@ import {
   EyeOff,
   Flag,
   HelpCircle,
+  History,
   LayoutGrid,
+  Loader2,
   Play,
   RotateCcw,
   Send,
@@ -20,20 +27,30 @@ import {
   Sparkles,
   Timer,
   Trophy,
+  X,
   XCircle,
 } from "lucide-react";
 import type { Route } from "./+types/exam-quiz";
+import type { AppShellOutletContext } from "./app-shell";
 import { AiPromptModal } from "~/components/AiPromptModal";
 import { ConfirmModal } from "~/components/ConfirmModal";
 import { ThemeToggle } from "~/components/ThemeToggle";
 import type { AiPromptQuestionContext } from "~/services/aiPromptBuilder";
 import {
+  aggregateExamHistoryStats,
+  buildQuizHistoryItems,
   calculateQuizSummary,
   formatCountdown,
   formatDuration,
   prepareQuizQuestions,
   prepareSingleQuestion,
 } from "~/services/quizEngine";
+import {
+  getQuizHistoryRecord,
+  listQuizHistorySummaries,
+  saveQuizHistoryRecord,
+  type CreateQuizHistoryInput,
+} from "~/services/quizHistory.server";
 import { getLocalExam } from "~/services/yamolCrawler.server";
 import {
   ALL_DIFFICULTY_LEVELS,
@@ -58,15 +75,67 @@ export function meta({ loaderData }: Route.MetaArgs) {
   ];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
-  const exam = await getLocalExam(params.examId);
+export async function loader({ params, request }: Route.LoaderArgs) {
+  const url = new URL(request.url);
+  const retryRecordId = url.searchParams.get("retryRecord");
+
+  const [exam, examHistoryList, retryRecord] = await Promise.all([
+    getLocalExam(params.examId),
+    listQuizHistorySummaries(params.examId),
+    retryRecordId ? getQuizHistoryRecord(retryRecordId) : Promise.resolve(null),
+  ]);
+
   if (!exam) {
     throw new Response(
-      `找不到本地考卷 #${params.examId}，請先返回題庫管理中心下載此考卷。`,
+      `找不到本地考卷 #${params.examId}，請先前往「匯入與探索考卷」下載此考卷。`,
       { status: 404 }
     );
   }
-  return { exam };
+
+  const statsMap = aggregateExamHistoryStats(examHistoryList);
+  const validRetryIds =
+    retryRecord &&
+    retryRecord.examId === exam.examId &&
+    retryRecord.wrongQuestionIds.length > 0
+      ? retryRecord.wrongQuestionIds
+      : null;
+
+  return {
+    exam,
+    examHistoryStats: statsMap[exam.examId] ?? null,
+    latestHistorySummary: examHistoryList[0] ?? null,
+    initialRetryQuestionIds: validRetryIds,
+  };
+}
+
+type SaveHistoryActionResponse =
+  { ok: true; recordId: string } | { ok: false; error: string };
+
+export async function action({
+  request,
+  params,
+}: Route.ActionArgs): Promise<SaveHistoryActionResponse> {
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") || "");
+
+  if (intent !== "save_history") {
+    return { ok: false, error: "未知的操作指令" };
+  }
+
+  try {
+    const rawPayload = String(formData.get("payload") || "");
+    const parsed = JSON.parse(rawPayload) as CreateQuizHistoryInput;
+    if (!parsed || parsed.examId !== params.examId) {
+      return { ok: false, error: "考卷編號不一致" };
+    }
+    const saved = await saveQuizHistoryRecord(parsed);
+    return { ok: true, recordId: saved.recordId };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "儲存測驗紀錄失敗",
+    };
+  }
 }
 
 const OPTION_KEYS: OptionKey[] = ["A", "B", "C", "D", "E"];
@@ -86,14 +155,29 @@ type ReviewFilter = "all" | "wrong_or_unanswered" | "flagged";
 type ReviewSort = "index" | "time_desc";
 
 export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
-  const { exam } = loaderData;
+  const {
+    exam,
+    examHistoryStats,
+    latestHistorySummary,
+    initialRetryQuestionIds,
+  } = loaderData;
+
+  const outletContext = useOutletContext<AppShellOutletContext | undefined>();
+  const setQuizFocusMode = outletContext?.setQuizFocusMode;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const saveHistoryFetcher = useFetcher<SaveHistoryActionResponse>();
 
   // ==================== 1. 設定階段狀態 ====================
   const [phase, setPhase] = useState<QuizPhase>("setup");
+  const [retryTargetIds, setRetryTargetIds] = useState<number[] | null>(
+    initialRetryQuestionIds
+  );
   const [mode, setMode] = useState<QuizMode>("practice");
   const [questionOrder, setQuestionOrder] =
     useState<OrderStrategy>("sequential");
-  const [optionOrder, setOptionOrder] = useState<OrderStrategy>("sequential");
+  const [optionOrder, setOptionOrder] = useState<OrderStrategy>(() =>
+    initialRetryQuestionIds ? "random" : "sequential"
+  );
   const [selectedDifficulties, setSelectedDifficulties] = useState<
     DifficultyLevel[]
   >([...ALL_DIFFICULTY_LEVELS]);
@@ -118,6 +202,16 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
   const questionStartRef = useRef<number | null>(null);
   const baseElapsedRef = useRef<number>(0);
   const [currentLiveElapsedMs, setCurrentLiveElapsedMs] = useState<number>(0);
+  const isCurrentSessionRetryRef = useRef<boolean>(false);
+  const hasSavedCurrentSessionRef = useRef<boolean>(false);
+
+  // 同步通知外層 AppShell 是否處於專注作答階段（作答中自動隱藏側邊導覽列）
+  useEffect(() => {
+    setQuizFocusMode?.(phase === "active");
+    return () => {
+      setQuizFocusMode?.(false);
+    };
+  }, [phase, setQuizFocusMode]);
 
   // ==================== 3. 結算檢討階段狀態 ====================
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
@@ -149,7 +243,17 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
     [attempts, exam.categoryTitle, exam.title, exam.year, questionOrder]
   );
 
-  // 統計原考卷各難度題數
+  // 若處於「指定錯題重練」狀態，題目來源鎖定為該批錯題
+  const setupSourceQuestions = useMemo(() => {
+    if (!retryTargetIds || retryTargetIds.length === 0) {
+      return exam.questions;
+    }
+    const idSet = new Set(retryTargetIds);
+    const matched = exam.questions.filter((q) => idSet.has(q.id));
+    return matched.length > 0 ? matched : exam.questions;
+  }, [exam.questions, retryTargetIds]);
+
+  // 統計設定階段來源題庫的各難度題數
   const difficultyCounts = useMemo(() => {
     const counts: Record<DifficultyLevel, number> = {
       非常簡單: 0,
@@ -158,20 +262,20 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
       困難: 0,
       非常困難: 0,
     };
-    for (const q of exam.questions) {
+    for (const q of setupSourceQuestions) {
       counts[q.difficulty] = (counts[q.difficulty] ?? 0) + 1;
     }
     return counts;
-  }, [exam.questions]);
+  }, [setupSourceQuestions]);
 
-  // 計算單題練習模式下符合所選難度的題目數量
+  // 計算設定階段符合所選難度的題目數量
   const matchingQuestionCount = useMemo(() => {
-    if (mode === "mock") return exam.questions.length;
+    if (mode === "mock") return setupSourceQuestions.length;
     if (selectedDifficulties.length === 0) return 0;
-    return exam.questions.filter((q) =>
+    return setupSourceQuestions.filter((q) =>
       selectedDifficulties.includes(q.difficulty)
     ).length;
-  }, [exam.questions, mode, selectedDifficulties]);
+  }, [setupSourceQuestions, mode, selectedDifficulties]);
 
   const currentQuestion = activeQuestions[currentIndex];
   const currentAttempt = currentQuestion
@@ -235,19 +339,89 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
     };
   }, [currentQuestionId, isCurrentQuestionTiming]);
 
-  // 結束測驗並進入結算畫面
+  // 結束測驗、自動寫入本地歷史測驗紀錄並進入結算畫面
   const finalizeQuiz = useCallback(
     (autoByTimeout = false) => {
-      flushCurrentQuestionTime();
+      const flushedAttempts: Record<number, QuestionAttempt> = { ...attempts };
+      const start = questionStartRef.current;
+
+      if (start !== null && currentQuestion) {
+        const deltaMs = Math.max(0, Math.round(performance.now() - start));
+        const updatedElapsed = baseElapsedRef.current + deltaMs;
+        baseElapsedRef.current = updatedElapsed;
+        const existing = flushedAttempts[currentQuestion.id];
+        if (existing) {
+          flushedAttempts[currentQuestion.id] = {
+            ...existing,
+            elapsedMs: updatedElapsed,
+          };
+        }
+      }
+
       questionStartRef.current = null;
+      setAttempts(flushedAttempts);
       setIsAutoSubmittedByTimeout(autoByTimeout);
       setShowSubmitConfirmModal(false);
       setReviewFilter("all");
       setReviewSort("index");
       setPhase("summary");
       window.scrollTo({ top: 0, behavior: "smooth" });
+
+      const summarySnapshot = calculateQuizSummary(
+        activeQuestions,
+        flushedAttempts
+      );
+
+      if (
+        !hasSavedCurrentSessionRef.current &&
+        activeQuestions.length > 0 &&
+        (mode === "mock" || summarySnapshot.answeredCount > 0)
+      ) {
+        hasSavedCurrentSessionRef.current = true;
+
+        const items = buildQuizHistoryItems(activeQuestions, flushedAttempts);
+        const wrongQuestionIds = items
+          .filter((item) => !item.isCorrect)
+          .map((item) => item.questionId);
+
+        const payload: CreateQuizHistoryInput = {
+          examId: exam.examId,
+          examTitle: exam.title,
+          categoryTitle: exam.categoryTitle,
+          examYear: exam.year,
+          mode,
+          isRetryWrongOnly: isCurrentSessionRetryRef.current || undefined,
+          isAutoSubmittedByTimeout: autoByTimeout,
+          questionOrder,
+          optionOrder,
+          timeLimitMinutes:
+            mode === "mock" && enableTimeLimit ? timeLimitMinutes : null,
+          summary: summarySnapshot,
+          wrongQuestionIds,
+          items,
+        };
+
+        const formData = new FormData();
+        formData.append("intent", "save_history");
+        formData.append("payload", JSON.stringify(payload));
+        saveHistoryFetcher.submit(formData, { method: "post" });
+      }
     },
-    [flushCurrentQuestionTime]
+    [
+      attempts,
+      currentQuestion,
+      activeQuestions,
+      mode,
+      exam.examId,
+      exam.title,
+      exam.categoryTitle,
+      exam.year,
+      questionOrder,
+      optionOrder,
+      enableTimeLimit,
+      timeLimitMinutes,
+      saveHistoryFetcher,
+    ]
   );
 
   // 模擬考模式：全域倒數計時器
@@ -281,7 +455,8 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
   // 啟動測驗（支援傳入自訂題目清單，例如「針對本次錯題重新練習」）
   const startQuizWithQuestions = (
     sourceQuestions: readonly ExamQuestion[],
-    overrideConfig?: Partial<QuizConfig>
+    overrideConfig?: Partial<QuizConfig>,
+    isRetryWrongOnly = false
   ) => {
     const effectiveMode = overrideConfig?.mode ?? mode;
     const effectiveQuestionOrder =
@@ -331,6 +506,8 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
     }
 
     baseElapsedRef.current = 0;
+    isCurrentSessionRetryRef.current = isRetryWrongOnly;
+    hasSavedCurrentSessionRef.current = false;
     setActiveQuestions(prepared);
     setAttempts(initialAttempts);
     setCurrentIndex(0);
@@ -602,12 +779,50 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
     if (originalWrongQuestions.length === 0) return;
 
     setMode("practice");
-    startQuizWithQuestions(originalWrongQuestions, {
-      mode: "practice",
-      questionOrder,
-      optionOrder,
-      selectedDifficulties: [...ALL_DIFFICULTY_LEVELS],
-    });
+    startQuizWithQuestions(
+      originalWrongQuestions,
+      {
+        mode: "practice",
+        questionOrder,
+        optionOrder,
+        selectedDifficulties: [...ALL_DIFFICULTY_LEVELS],
+      },
+      true
+    );
+  };
+
+  // 從設定頁直接針對上次歷史紀錄的錯題啟動單題練習
+  const handleQuickRetryLatestWrong = () => {
+    if (
+      !latestHistorySummary ||
+      latestHistorySummary.wrongQuestionIds.length === 0
+    ) {
+      return;
+    }
+    const wrongIdSet = new Set(latestHistorySummary.wrongQuestionIds);
+    const targetQuestions = exam.questions.filter((q) => wrongIdSet.has(q.id));
+    if (targetQuestions.length === 0) return;
+
+    setMode("practice");
+    startQuizWithQuestions(
+      targetQuestions,
+      {
+        mode: "practice",
+        questionOrder,
+        optionOrder,
+        selectedDifficulties: [...ALL_DIFFICULTY_LEVELS],
+      },
+      true
+    );
+  };
+
+  const handleClearRetryTarget = () => {
+    setRetryTargetIds(null);
+    if (searchParams.has("retryRecord")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("retryRecord");
+      setSearchParams(next, { replace: true });
+    }
   };
 
   const toggleDifficultySelection = (lvl: DifficultyLevel) => {
@@ -618,8 +833,11 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
 
   // ==================== 畫面渲染：1. 設定階段 ====================
   if (phase === "setup") {
+    const isRetryModeActive =
+      retryTargetIds !== null && retryTargetIds.length > 0;
+
     return (
-      <div className="min-h-screen bg-slate-50 pb-16 dark:bg-slate-950">
+      <div className="pb-16">
         <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-6 py-4">
             <Link
@@ -629,20 +847,47 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
               <ArrowLeft className="h-4 w-4" />
               返回考卷閱覽
             </Link>
-            <div className="flex flex-wrap items-center gap-3">
+
+            {examHistoryStats && (
               <Link
-                to="/"
-                className="text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                to={`/history?examId=${exam.examId}`}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
-                題庫管理中心
+                <History className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                此卷測驗紀錄 ({examHistoryStats.attemptCount} 次)
               </Link>
-              <ThemeToggle />
-            </div>
+            )}
           </div>
         </header>
 
         <main className="mx-auto max-w-4xl space-y-6 px-6 pt-8">
-          {/* 考卷標題卡片 */}
+          {/* 若透過歷史紀錄「重練錯題」進入時的專項提示卡片 */}
+          {isRetryModeActive && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 text-sm text-amber-950 dark:border-amber-800/70 dark:bg-amber-950/50 dark:text-amber-200">
+              <div className="flex items-center gap-2.5">
+                <RotateCcw className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div>
+                  <p className="font-bold">
+                    已鎖定歷史紀錄中的 {setupSourceQuestions.length}{" "}
+                    道錯題／未答題進行專項重練
+                  </p>
+                  <p className="text-xs opacity-85">
+                    已預設開啟「隨機打亂選項」避免背誦位置，您仍可於下方自由調整順序後開始。
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearRetryTarget}
+                className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-slate-800"
+              >
+                <X className="h-3.5 w-3.5" />
+                改回練習完整考卷 ({exam.totalQuestions} 題)
+              </button>
+            </div>
+          )}
+
+          {/* 考卷標題卡片與歷史表現摘要 */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300">
@@ -658,6 +903,45 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
             <h1 className="mt-2 text-xl font-bold text-slate-900 dark:text-slate-100">
               {exam.title}
             </h1>
+
+            {!isRetryModeActive && examHistoryStats && latestHistorySummary && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/90 px-4 py-3 text-xs dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="flex flex-wrap items-center gap-3 text-slate-600 dark:text-slate-300">
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-100">
+                    <Trophy className="h-4 w-4 text-amber-500" />
+                    歷史最佳：{examHistoryStats.bestScore} 分
+                  </span>
+                  <span>·</span>
+                  <span>
+                    上次得分：
+                    <strong className="text-indigo-600 dark:text-indigo-400">
+                      {examHistoryStats.latestScore} 分
+                    </strong>{" "}
+                    （共測驗 {examHistoryStats.attemptCount} 次）
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    to={`/history/${examHistoryStats.latestRecordId}`}
+                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    檢視上次檢討
+                  </Link>
+                  {latestHistorySummary.wrongQuestionIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleQuickRetryLatestWrong}
+                      className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1 font-semibold text-white transition hover:bg-amber-700"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      直接重練上次錯題 (
+                      {latestHistorySummary.wrongQuestionIds.length} 題)
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 模式選擇 */}
@@ -803,8 +1087,8 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
                   步驟 3：單題練習模式專屬選項
                 </h2>
                 <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300">
-                  符合篩選題數：{matchingQuestionCount} / {exam.totalQuestions}{" "}
-                  題
+                  符合篩選題數：{matchingQuestionCount} /{" "}
+                  {setupSourceQuestions.length} 題
                 </span>
               </div>
 
@@ -971,12 +1255,23 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
             <button
               type="button"
               disabled={matchingQuestionCount === 0}
-              onClick={() => startQuizWithQuestions(exam.questions)}
+              onClick={() =>
+                startQuizWithQuestions(
+                  setupSourceQuestions,
+                  undefined,
+                  isRetryModeActive
+                )
+              }
               className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Play className="h-4 w-4" />
-              開始{mode === "practice" ? "單題練習" : "模擬測驗"} (
-              {matchingQuestionCount} 題)
+              開始
+              {isRetryModeActive
+                ? "錯題專項"
+                : mode === "practice"
+                  ? "單題練習"
+                  : "模擬測驗"}{" "}
+              ({matchingQuestionCount} 題)
             </button>
           </div>
         </main>
@@ -1492,21 +1787,44 @@ export default function ExamQuiz({ loaderData }: Route.ComponentProps) {
   }
 
   // ==================== 畫面渲染：3. 交卷結算與錯題檢討階段 ====================
+  const isSavingHistory = saveHistoryFetcher.state !== "idle";
+  const savedRecordId =
+    saveHistoryFetcher.data?.ok === true
+      ? saveHistoryFetcher.data.recordId
+      : null;
+
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 dark:bg-slate-950">
+    <div className="pb-20">
       <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <Link
-            to={`/exams/${exam.examId}`}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            返回考卷閱覽
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              to={`/exams/${exam.examId}`}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              返回考卷閱覽
+            </Link>
+
+            {isSavingHistory && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                正在儲存測驗紀錄...
+              </span>
+            )}
+
+            {!isSavingHistory && savedRecordId && (
+              <Link
+                to={`/history/${savedRecordId}`}
+                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                已保存至歷史測驗紀錄
+              </Link>
+            )}
+          </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <ThemeToggle />
-
             {summaryResult.wrongCount + summaryResult.unansweredCount > 0 && (
               <button
                 type="button"

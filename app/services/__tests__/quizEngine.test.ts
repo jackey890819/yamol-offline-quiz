@@ -1,12 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  aggregateExamHistoryStats,
+  buildQuizHistoryItems,
+  calculateOverallHistoryStats,
   calculateQuizSummary,
   formatCountdown,
   formatDuration,
   prepareQuizQuestions,
   prepareSingleQuestion,
+  reconstructPreparedQuestion,
 } from "~/services/quizEngine";
-import type { ExamQuestion, QuestionAttempt } from "~/types/exam";
+import type {
+  ExamQuestion,
+  QuestionAttempt,
+  QuizHistorySummary,
+} from "~/types/exam";
 
 const sampleQuestions: ExamQuestion[] = [
   {
@@ -171,5 +179,118 @@ describe("quizEngine", () => {
     expect(formatCountdown(3600)).toBe("01:00:00");
     expect(formatCountdown(125)).toBe("02:05");
     expect(formatCountdown(0)).toBe("00:00");
+  });
+
+  it("可從歷史測驗快照精準還原隨機洗牌後的選項順序、答案與統計", () => {
+    const shuffled = prepareSingleQuestion(
+      sampleQuestions[0]!,
+      5,
+      "random",
+      () => 0
+    );
+    const attempts: Record<number, QuestionAttempt> = {
+      101: {
+        questionId: 101,
+        questionNumber: 1,
+        selectedOption: "C",
+        isSubmitted: true,
+        isCorrect: false,
+        isFlagged: true,
+        elapsedMs: 9300,
+      },
+    };
+
+    const items = buildQuizHistoryItems([shuffled], attempts);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.selectedOption).toBe("C");
+    expect(items[0]?.isCorrect).toBe(false);
+    expect(items[0]?.isFlagged).toBe(true);
+    expect(items[0]?.elapsedMs).toBe(9300);
+
+    const reconstructed = reconstructPreparedQuestion(
+      sampleQuestions[0]!,
+      items[0]!
+    );
+    expect(reconstructed.displayIndex).toBe(5);
+    expect(reconstructed.options).toEqual(shuffled.options);
+    expect(reconstructed.answer).toBe(shuffled.answer);
+    expect(reconstructed.stats).toEqual(shuffled.stats);
+    expect(reconstructed.optionMapping).toEqual(shuffled.optionMapping);
+  });
+
+  it("正確彙整各考卷的最高分、最近得分與全域歷史統計", () => {
+    const summaries: QuizHistorySummary[] = [
+      {
+        recordId: "rec-1",
+        examId: "140603",
+        examTitle: "資安概論 113",
+        categoryTitle: "iPAS 資安",
+        examYear: 2024,
+        mode: "mock",
+        isAutoSubmittedByTimeout: false,
+        questionOrder: "sequential",
+        optionOrder: "sequential",
+        timeLimitMinutes: 60,
+        completedAt: "2026-10-28T10:00:00.000Z",
+        summary: {
+          totalQuestions: 50,
+          answeredCount: 50,
+          correctCount: 45,
+          wrongCount: 5,
+          unansweredCount: 0,
+          score: 90,
+          totalElapsedMs: 600000,
+          averageElapsedMs: 12000,
+        },
+        wrongQuestionIds: [1, 2, 3, 4, 5],
+      },
+      {
+        recordId: "rec-2",
+        examId: "140603",
+        examTitle: "資安概論 113",
+        categoryTitle: "iPAS 資安",
+        examYear: 2024,
+        mode: "practice",
+        isAutoSubmittedByTimeout: false,
+        questionOrder: "random",
+        optionOrder: "random",
+        timeLimitMinutes: null,
+        completedAt: "2026-10-29T12:00:00.000Z",
+        summary: {
+          totalQuestions: 10,
+          answeredCount: 10,
+          correctCount: 8,
+          wrongCount: 2,
+          unansweredCount: 0,
+          score: 80,
+          totalElapsedMs: 120000,
+          averageElapsedMs: 12000,
+        },
+        wrongQuestionIds: [2, 5],
+      },
+    ];
+
+    const perExam = aggregateExamHistoryStats(summaries);
+    expect(perExam["140603"]).toEqual({
+      examId: "140603",
+      attemptCount: 2,
+      bestScore: 90,
+      latestScore: 80,
+      latestCompletedAt: "2026-10-29T12:00:00.000Z",
+      latestRecordId: "rec-2",
+      latestWrongCount: 2,
+    });
+
+    const overall = calculateOverallHistoryStats(summaries);
+    expect(overall).toEqual({
+      totalSessions: 2,
+      mockSessions: 1,
+      practiceSessions: 1,
+      averageScore: 85,
+      totalQuestions: 60,
+      totalCorrect: 53,
+      overallAccuracyPercent: 88,
+      totalElapsedMs: 720000,
+    });
   });
 });

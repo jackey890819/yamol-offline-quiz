@@ -7,14 +7,16 @@ import {
   Eye,
   EyeOff,
   FileJson,
+  History,
   Play,
   Search,
   Sparkles,
 } from "lucide-react";
 import type { Route } from "./+types/exam-detail";
 import { AiPromptModal } from "~/components/AiPromptModal";
-import { ThemeToggle } from "~/components/ThemeToggle";
 import type { AiPromptQuestionContext } from "~/services/aiPromptBuilder";
+import { aggregateExamHistoryStats } from "~/services/quizEngine";
+import { listQuizHistorySummaries } from "~/services/quizHistory.server";
 import { getLocalExam } from "~/services/yamolCrawler.server";
 import styles from "~/styles/exam-viewer.module.css";
 import {
@@ -33,14 +35,18 @@ export function meta({ loaderData }: Route.MetaArgs) {
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
-  const exam = await getLocalExam(params.examId);
+  const [exam, examHistoryList] = await Promise.all([
+    getLocalExam(params.examId),
+    listQuizHistorySummaries(params.examId),
+  ]);
   if (!exam) {
     throw new Response(
-      `找不到本地考卷 #${params.examId}，請先返回首頁將該考卷匯入下載至本地。`,
+      `找不到本地考卷 #${params.examId}，請先前往「匯入與探索考卷」下載此考卷。`,
       { status: 404 }
     );
   }
-  return { exam };
+  const statsMap = aggregateExamHistoryStats(examHistoryList);
+  return { exam, examHistoryStats: statsMap[exam.examId] ?? null };
 }
 
 const DIFFICULTY_BADGE_STYLE: Record<DifficultyLevel, string> = {
@@ -56,7 +62,7 @@ const DIFFICULTY_BADGE_STYLE: Record<DifficultyLevel, string> = {
 const OPTION_KEYS: OptionKey[] = ["A", "B", "C", "D", "E"];
 
 export default function ExamDetail({ loaderData }: Route.ComponentProps) {
-  const { exam } = loaderData;
+  const { exam, examHistoryStats } = loaderData;
 
   // 預設採用「模糊遮罩（滑鼠移過顯示答案）」模式，重現阿摩看題體驗；可一鍵切換為「直接顯示答案」
   const [answerDisplayMode, setAnswerDisplayMode] = useState<"blur" | "direct">(
@@ -132,7 +138,7 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 dark:bg-slate-950">
+    <div className="pb-20">
       {/* 頂部考卷資訊列 */}
       <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto max-w-5xl px-6 py-5">
@@ -142,11 +148,20 @@ export default function ExamDetail({ loaderData }: Route.ComponentProps) {
               className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
             >
               <ArrowLeft className="h-4 w-4" />
-              返回題庫管理中心
+              返回本地題庫
             </Link>
 
             <div className="flex flex-wrap items-center gap-2.5">
-              <ThemeToggle />
+              {examHistoryStats && (
+                <Link
+                  to={`/history?examId=${exam.examId}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  <History className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  此卷紀錄 ({examHistoryStats.attemptCount} 次 · 最高{" "}
+                  {examHistoryStats.bestScore} 分)
+                </Link>
+              )}
 
               <a
                 href={`/api/exams/${exam.examId}/export`}

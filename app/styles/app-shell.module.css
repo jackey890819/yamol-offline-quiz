@@ -1,0 +1,92 @@
+/* 行動版滑動導覽抽屜 (Scroll-Snap + Scroll-Driven Backdrop Animation) */
+.drawer {
+  --drawer-width: min(20rem, 82dvw);
+  --drawer-backdrop: 0;
+
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  background: transparent;
+  border: 0;
+  overflow: visible;
+}
+
+.drawerVisible {
+  display: block;
+}
+
+.drawerBackdrop {
+  position: absolute;
+  inset: 0;
+  background: #0f172a;
+  opacity: calc(var(--drawer-backdrop) * 0.55);
+  pointer-events: none;
+}
+
+.drawerScroller {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--drawer-width) 100%;
+  overflow-x: scroll;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+
+.drawerScroller::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .drawerScroller {
+    scroll-behavior: smooth;
+  }
+}
+
+.drawerScroller::after {
+  content: "";
+  scroll-snap-align: end;
+  scroll-initial-target: nearest;
+}
+
+.drawerSheet {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100svh;
+  overflow-y: auto;
+  scroll-snap-align: start;
+  scrollbar-width: none;
+}
+
+.drawerSheet::-webkit-scrollbar {
+  display: none;
+}
+
+@supports (animation-timeline: scroll()) {
+  @property --drawer-backdrop {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0;
+  }
+
+  .drawer {
+    timeline-scope: --drawer-fade;
+    animation: fadeDrawerBackdrop linear both;
+    animation-timeline: --drawer-fade;
+  }
+
+  .drawerScroller {
+    scroll-timeline: --drawer-fade x;
+  }
+
+  @keyframes fadeDrawerBackdrop {
+    0% {
+      --drawer-backdrop: 1;
+    }
+    100% {
+      --drawer-backdrop: 0;
+    }
+  }
+}
+

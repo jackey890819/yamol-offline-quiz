@@ -1,9 +1,12 @@
 import type {
+  ExamHistoryStats,
   ExamQuestion,
   OptionKey,
   PreparedQuestion,
   QuestionAttempt,
   QuizConfig,
+  QuizHistoryItemSnapshot,
+  QuizHistorySummary,
   QuizSummaryResult,
 } from "~/types/exam";
 
@@ -193,4 +196,186 @@ export function formatCountdown(remainingSeconds: number): string {
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+/**
+ * 將當次測驗題目與作答狀態轉換為可序列化儲存的精簡歷史快照
+ */
+export function buildQuizHistoryItems(
+  questions: readonly PreparedQuestion[],
+  attempts: Readonly<Record<number, QuestionAttempt>>
+): QuizHistoryItemSnapshot[] {
+  return questions.map((q) => {
+    const att = attempts[q.id];
+    const selectedOption = att?.selectedOption ?? null;
+    return {
+      questionId: q.id,
+      questionNumber: q.questionNumber,
+      displayIndex: q.displayIndex,
+      optionMapping: { ...q.optionMapping },
+      answer: q.answer,
+      selectedOption,
+      isCorrect: selectedOption !== null && selectedOption === q.answer,
+      isFlagged: Boolean(att?.isFlagged),
+      elapsedMs: Math.max(0, Math.round(att?.elapsedMs ?? 0)),
+    };
+  });
+}
+
+/**
+ * 根據本地考卷原題與歷史快照中的 `optionMapping`，精準還原當時測驗畫面上的選項順序、附圖、正解與選答統計
+ */
+export function reconstructPreparedQuestion(
+  question: ExamQuestion,
+  snapshot: QuizHistoryItemSnapshot
+): PreparedQuestion {
+  const mappedDisplayKeys = STANDARD_KEYS.filter(
+    (key) => snapshot.optionMapping[key] !== undefined
+  );
+
+  if (mappedDisplayKeys.length === 0) {
+    return prepareSingleQuestion(question, snapshot.displayIndex, "sequential");
+  }
+
+  const newOptions: Partial<Record<OptionKey, string>> = {};
+  const newOptionImages: Partial<Record<OptionKey, string[]>> = {};
+  const newStats: Partial<Record<OptionKey, number>> = {};
+  const optionMapping: Partial<Record<OptionKey, OptionKey>> = {};
+  let newAnswer: OptionKey = snapshot.answer;
+
+  for (const displayKey of mappedDisplayKeys) {
+    const sourceKey = snapshot.optionMapping[displayKey];
+    if (!sourceKey) continue;
+    optionMapping[displayKey] = sourceKey;
+
+    if (
+      question.options[sourceKey] !== undefined ||
+      (question.optionImages?.[sourceKey]?.length ?? 0) > 0
+    ) {
+      newOptions[displayKey] = question.options[sourceKey] ?? "";
+    }
+    const sourceImages = question.optionImages?.[sourceKey];
+    if (sourceImages && sourceImages.length > 0) {
+      newOptionImages[displayKey] = [...sourceImages];
+    }
+    if (question.stats[sourceKey] !== undefined) {
+      newStats[displayKey] = question.stats[sourceKey];
+    }
+    if (sourceKey === question.answer) {
+      newAnswer = displayKey;
+    }
+  }
+
+  return {
+    ...question,
+    displayIndex: snapshot.displayIndex,
+    options: newOptions,
+    optionImages:
+      Object.keys(newOptionImages).length > 0 ? newOptionImages : undefined,
+    answer: newAnswer,
+    stats: newStats,
+    optionMapping,
+  };
+}
+
+/**
+ * 依考卷 ID 彙整歷史測驗摘要統計（假設傳入或內部自動依時間排序）
+ */
+export function aggregateExamHistoryStats(
+  summaries: readonly QuizHistorySummary[]
+): Record<string, ExamHistoryStats> {
+  const sorted = [...summaries].sort((a, b) =>
+    b.completedAt.localeCompare(a.completedAt)
+  );
+  const map: Record<string, ExamHistoryStats> = {};
+
+  for (const item of sorted) {
+    const existing = map[item.examId];
+    const wrongPlusUnanswered =
+      item.summary.wrongCount + item.summary.unansweredCount;
+
+    if (!existing) {
+      map[item.examId] = {
+        examId: item.examId,
+        attemptCount: 1,
+        bestScore: item.summary.score,
+        latestScore: item.summary.score,
+        latestCompletedAt: item.completedAt,
+        latestRecordId: item.recordId,
+        latestWrongCount: wrongPlusUnanswered,
+      };
+    } else {
+      existing.attemptCount += 1;
+      if (item.summary.score > existing.bestScore) {
+        existing.bestScore = item.summary.score;
+      }
+    }
+  }
+
+  return map;
+}
+
+export interface OverallHistoryStats {
+  totalSessions: number;
+  mockSessions: number;
+  practiceSessions: number;
+  averageScore: number;
+  totalQuestions: number;
+  totalCorrect: number;
+  overallAccuracyPercent: number;
+  totalElapsedMs: number;
+}
+
+/**
+ * 計算全域歷史測驗統計指標（供歷史紀錄儀表板使用）
+ */
+export function calculateOverallHistoryStats(
+  summaries: readonly QuizHistorySummary[]
+): OverallHistoryStats {
+  const totalSessions = summaries.length;
+  if (totalSessions === 0) {
+    return {
+      totalSessions: 0,
+      mockSessions: 0,
+      practiceSessions: 0,
+      averageScore: 0,
+      totalQuestions: 0,
+      totalCorrect: 0,
+      overallAccuracyPercent: 0,
+      totalElapsedMs: 0,
+    };
+  }
+
+  let mockSessions = 0;
+  let practiceSessions = 0;
+  let scoreSum = 0;
+  let totalQuestions = 0;
+  let totalCorrect = 0;
+  let totalElapsedMs = 0;
+
+  for (const item of summaries) {
+    if (item.mode === "mock") {
+      mockSessions += 1;
+    } else {
+      practiceSessions += 1;
+    }
+    scoreSum += item.summary.score;
+    totalQuestions += item.summary.totalQuestions;
+    totalCorrect += item.summary.correctCount;
+    totalElapsedMs += item.summary.totalElapsedMs;
+  }
+
+  return {
+    totalSessions,
+    mockSessions,
+    practiceSessions,
+    averageScore: Math.round(scoreSum / totalSessions),
+    totalQuestions,
+    totalCorrect,
+    overallAccuracyPercent:
+      totalQuestions > 0
+        ? Math.round((totalCorrect / totalQuestions) * 100)
+        : 0,
+    totalElapsedMs,
+  };
 }

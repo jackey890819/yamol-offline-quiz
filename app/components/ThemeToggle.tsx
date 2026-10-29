@@ -90,7 +90,11 @@ export function setThemePreference(next: ThemePreference) {
   notifyThemeListeners();
 }
 
-export function ThemeToggle() {
+interface ThemeToggleProps {
+  compact?: boolean;
+}
+
+export function ThemeToggle({ compact = false }: ThemeToggleProps) {
   const preference = useSyncExternalStore(
     subscribeThemePreference,
     getStoredPreference,
@@ -131,6 +135,25 @@ export function ThemeToggle() {
       icon: Monitor,
     },
   ];
+
+  if (compact) {
+    const currentIndex = options.findIndex((o) => o.id === preference);
+    const currentOption = options[currentIndex] ?? options[2]!;
+    const nextOption = options[(currentIndex + 1) % options.length]!;
+    const CurrentIcon = currentOption.icon;
+
+    return (
+      <button
+        type="button"
+        onClick={() => setThemePreference(nextOption.id)}
+        title={`目前主題：${currentOption.label}（點擊切換為${nextOption.label}）`}
+        aria-label={`目前主題：${currentOption.label}，點擊切換為${nextOption.label}`}
+        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-slate-100 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-indigo-400"
+      >
+        <CurrentIcon className="h-4 w-4" aria-hidden="true" />
+      </button>
+    );
+  }
 
   return (
     <div
